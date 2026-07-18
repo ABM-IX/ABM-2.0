@@ -1,0 +1,9 @@
+# ABM 2.0 — Ambiguity Quarantine Directory
+# Spec Reference: ABM_SPEC.md section 6
+#
+# Any ingestion package or code integration that fails the Confidence
+# Threshold (C < 0.85) or breaches a Hard Floor Gate is moved here and
+# triggers a system notification for manual human intervention.
+#
+# This directory is populated by Phase v0.4 (Safe Action Sandbox).
+# It is created now as a structural placeholder per spec section 6.

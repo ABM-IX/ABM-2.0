@@ -1,0 +1,7 @@
+# ABM 2.0 — Phase v0.1 Memory Brain Core
+# All inference and embeddings route through local Ollama at 127.0.0.1:11434.
+# No cloud LLM APIs permitted (spec section 4 mandate).
+
+chromadb>=0.5.0
+pydantic>=2.0.0
+requests>=2.31.0

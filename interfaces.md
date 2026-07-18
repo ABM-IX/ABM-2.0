@@ -1,10 +1,10 @@
 # interfaces.md
-# ABM 2.0 — Phase v0.1 Memory Brain Core
-# Complete API Reference: Every Function Signature, Collection Name, and Metadata Shape
+# ABM 2.0 — Phases v0.1 & v0.2
+# Complete API Reference: Every Function Signature, File Path, and Metadata Shape
 
 > This document is the single source of truth for every public interface
-> created in Phase v0.1. Any tool or agent building on this phase must
-> consult this file before writing integration code.
+> created in Phases v0.1 and v0.2. Any tool or agent building on this
+> codebase must consult this file before writing integration code.
 
 ---
 
@@ -18,8 +18,33 @@
 6. [Module: `abm.memory.metadata_models`](#module-abmmemory-metadata_models)
 7. [Module: `abm.memory.chunking`](#module-abmmemory-chunking)
 8. [Module: `abm.memory` (package)](#module-abmmemory-package)
-9. [Constants Reference](#constants-reference)
-10. [Test Suite](#test-suite)
+9. [Constants Reference (v0.1)](#constants-reference)
+10. [Phase v0.2 — Developer Companion Node](#phase-v02--developer-companion-node)
+    - [Module: `abm.companion.file_watcher`](#module-abmcompanion-file_watcher)
+    - [Module: `abm.companion.git_pipeline`](#module-abmcompanion-git_pipeline)
+    - [Module: `abm.companion.code_structure_analyzer`](#module-abmcompanion-code_structure_analyzer)
+    - [Module: `abm.companion.style_fingerprint`](#module-abmcompanion-style_fingerprint)
+    - [Module: `abm.companion.ingestion_coordinator`](#module-abmcompanion-ingestion_coordinator)
+    - [Module: `abm.companion` (package)](#module-abmcompanion-package)
+    - [Constants Reference (v0.2)](#constants-reference-v02)
+11. [Phase v0.3 — Executive Orchestrator Engine](#phase-v03--executive-orchestrator-engine)
+    - [Module: `abm.orchestrator.departments`](#module-abmorchestrator-departments)
+    - [Module: `abm.orchestrator.task_contract`](#module-abmorchestrator-task_contract)
+    - [Module: `abm.orchestrator.model_gateway`](#module-abmorchestrator-model_gateway)
+    - [Module: `abm.orchestrator.router`](#module-abmorchestrator-router)
+    - [Module: `abm.orchestrator` (package)](#module-abmorchestrator-package)
+12. [Phase v0.4 — Safe Action Sandbox](#phase-v04--safe-action-sandbox)
+    - [Module: `abm.sandbox.models`](#module-abmsandbox-models)
+    - [Module: `abm.sandbox.container`](#module-abmsandbox-container)
+    - [Module: `abm.sandbox.execution_loop`](#module-abmsandbox-execution_loop)
+    - [Module: `abm.sandbox.validation_gate`](#module-abmsandbox-validation_gate)
+    - [Module: `abm.sandbox` (package)](#module-abmsandbox-package)
+13. [Phase v0.5 — FirstMinds Strategic Wing](#phase-v05--firstminds-strategic-wing)
+    - [Module: `abm.strategic_wing.decision_journal`](#module-abmstrategic_wing-decision_journal)
+    - [Module: `abm.strategic_wing.workflow_monitor`](#module-abmstrategic_wing-workflow_monitor)
+    - [Module: `abm.strategic_wing.strategic_asset_analyzer`](#module-abmstrategic_wing-strategic_asset_analyzer)
+    - [Module: `abm.strategic_wing` (package)](#module-abmstrategic_wing-package)
+14. [Test Suite](#test-suite)
 
 ---
 
@@ -29,15 +54,44 @@
 ABM-2.0/
 ├── abm/
 │   ├── __init__.py                    # Package root — version and phase metadata
-│   └── memory/
-│       ├── __init__.py                # Re-exports ChromaController, OllamaEmbeddingWrapper
-│       ├── chroma_controller.py       # ChromaDB collection manager
-│       └── embedding_wrapper.py       # Ollama nomic-embed-text connector
+│   ├── memory/                        # v0.1 — sealed, do not modify
+│   │   ├── __init__.py                # Re-exports all v0.1 public symbols
+│   │   ├── chroma_controller.py       # ChromaDB collection manager
+│   │   ├── embedding_wrapper.py       # Ollama nomic-embed-text connector
+│   │   ├── chunking.py                # Stream A/B/C chunking helpers
+│   │   └── metadata_models.py         # Pydantic metadata validators
+│   └── companion/                     # v0.2 — Developer Companion Node
+│       ├── __init__.py                # Re-exports all v0.2 public symbols
+│       ├── file_watcher.py            # watchdog-based file change monitor
+│       ├── git_pipeline.py            # GitPython commit/diff/branch reader
+│       ├── code_structure_analyzer.py # General-purpose AST/structure analyzer
+│       ├── style_fingerprint.py       # AST-based style analyzer
+│       └── ingestion_coordinator.py   # Pipeline coordinator → calls v0.1 API
+│   └── orchestrator/                  # v0.3 — Executive Orchestrator Engine
+│       ├── __init__.py                # Re-exports all v0.3 public symbols
+│       ├── departments.py             # Department enum + sandbox configs
+│       ├── task_contract.py           # Pydantic TaskContract + RouterResult
+│       ├── model_gateway.py           # Ollama phi3:mini caller
+│       └── router.py                  # Non-generating ClassificationRouter
+│   └── sandbox/                       # v0.4 — Safe Action Sandbox
+│       ├── __init__.py                # Re-exports all v0.4 public symbols
+│       ├── models.py                  # ExecutionResult and ValidationScores
+│       ├── container.py               # Ephemeral Docker Sandbox controller
+│       ├── execution_loop.py          # SandboxCheckLoop compiler test injector
+│       └── validation_gate.py         # Multi-factor governance math & quarantine
+│   └── strategic_wing/                # v0.5 — FirstMinds Strategic Wing
+│       ├── __init__.py                # Re-exports all v0.5 public symbols
+│       ├── decision_journal.py        # Writes strategic decisions to Stream D
+│       └── workflow_monitor.py        # In-flight task state aggregation
 ├── tests/
 │   ├── __init__.py
-│   ├── test_phase_v01_gate.py         # Hard gate: isolation + chunking + embed consistency
+│   ├── test_phase_v01_gate.py         # Hard gate: v0.1 isolation + chunking + embed
 │   ├── test_memory_isolation.py       # Mock-assertion isolation / embed contract tests
-│   └── test_metadata_and_chunking.py  # Metadata + chunking contract tests
+│   ├── test_metadata_and_chunking.py  # Metadata + chunking contract tests
+│   ├── test_phase_v02_gate.py         # Hard gate: v0.2 watcher + git + style + ingestion
+│   ├── test_phase_v03_gate.py         # Hard gate: v0.3 router + schema boundaries
+│   ├── test_phase_v04_gate.py         # Hard gate: v0.4 math governance + docker isolation
+│   └── test_phase_v05_gate.py         # Hard gate: v0.5 strategic wing tools
 ├── memory/
 │   └── ambiguity_quarantine/          # Spec-defined quarantine dir (Phase v0.4 feature)
 │       └── .gitkeep
@@ -680,3 +734,1167 @@ Isolation gate uses real `ChromaController(in_memory=True)` (EphemeralClient). E
 ---
 
 *Generated by Antigravity for ABM 2.0 Phase v0.1. Update this file whenever new functions or schemas are added.*
+
+---
+
+## Phase v0.2 — Developer Companion Node
+
+> [!IMPORTANT]
+> All v0.2 modules call into v0.1 through its **public API only**. No v0.1 file was modified.
+> The only class permitted to call `ChromaController.add_document()` is `IngestionCoordinator`.
+
+---
+
+## Module: `abm.companion.file_watcher`
+
+**File:** [`abm/companion/file_watcher.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/companion/file_watcher.py)
+
+### Constants
+
+| Constant | Type | Value |
+|----------|------|-------|
+| `CODE_EXTENSIONS` | `frozenset[str]` | `{".py", ".dart", ".kt", ".java", ".js", ".css", ".html"}` |
+| `DEVICE_SOURCE` | `str` | `"dynamic_mobile_node"` |
+| `DEFAULT_DEBOUNCE_SECONDS` | `float` | `1.0` |
+
+### Dataclass `FileChangeEvent`
+
+```python
+@dataclass
+class FileChangeEvent:
+    path: str              # Absolute file path
+    event_type: str        # "created" | "modified" | "deleted"
+    epoch_timestamp: int   # Unix timestamp (integer seconds) of detection
+    repository: str        # Git repo name inferred from nearest .git parent ("" if none)
+    device_source: str     # Always "dynamic_mobile_node" — post_init set, do not pass
+    extension: str         # Lowercase file extension incl. leading dot — post_init derived
+    is_code_file: bool     # True if extension in CODE_EXTENSIONS — post_init derived
+```
+
+`device_source`, `extension`, and `is_code_file` are set automatically in `__post_init__`.
+Only `path`, `event_type`, `epoch_timestamp`, `repository` are constructor parameters.
+
+### Class `WorkspaceFileWatcher`
+
+```python
+class WorkspaceFileWatcher:
+    def __init__(
+        self,
+        watch_paths: list[str],
+        on_code_change: Callable[[FileChangeEvent], None],
+        on_telemetry_event: Callable[[FileChangeEvent], None],
+        debounce_seconds: float = 1.0,
+    ) -> None: ...
+```
+
+**Parameters:**
+- `watch_paths` — List of absolute directory paths to monitor recursively. Must not be empty.
+- `on_code_change` — Callback fired when a code file changes (→ Stream A ingestion).
+- `on_telemetry_event` — Callback fired when a non-code file changes (→ Stream C ingestion).
+- `debounce_seconds` — Collapses rapid save storms into one event per file. Default `1.0`.
+
+#### `start() -> None`
+Starts the watchdog Observer in a background daemon thread. Idempotent.
+**Raises:** `FileNotFoundError` if any `watch_paths` entry does not exist.
+
+#### `stop() -> None`
+Stops the observer and joins its thread. Idempotent.
+
+#### `is_running() -> bool`
+Returns `True` if the background observer is active.
+
+#### Properties
+
+```python
+@property
+def watch_paths(self) -> list[str]       # Paths being monitored (copy)
+@property
+def debounce_seconds(self) -> float      # Debounce window in seconds
+```
+
+### Internal: `_infer_repository(file_path: str) -> str`
+
+```python
+def _infer_repository(file_path: str) -> str
+```
+
+Walks up the directory tree from `file_path` to find a `.git` directory.
+Returns the directory basename containing `.git`, or `""` if not found.
+
+---
+
+## Module: `abm.companion.git_pipeline`
+
+**File:** [`abm/companion/git_pipeline.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/companion/git_pipeline.py)
+
+### Exceptions
+
+```python
+class GitPipelineError(RuntimeError): ...
+```
+Raised for any Git operation failure. Subclasses `RuntimeError`.
+
+### Constants
+
+| Constant | Type | Value |
+|----------|------|-------|
+| `DEFAULT_MAX_COMMITS` | `int` | `50` |
+| `DEVICE_SOURCE` | `str` | `"dynamic_mobile_node"` |
+
+### Dataclass `CommitRecord`
+
+```python
+@dataclass
+class CommitRecord:
+    sha: str                    # Full 40-char commit SHA
+    message: str                # First line of commit message (≤200 chars)
+    author: str                 # Commit author name
+    epoch_timestamp: int        # Unix timestamp (authored time)
+    files_changed: list[str]    # Relative paths of all files touched
+```
+
+### Dataclass `FileDiff`
+
+```python
+@dataclass
+class FileDiff:
+    path: str          # Relative file path within repository
+    language: str      # Language detected from extension ("python"|"dart"|"kotlin")
+    added_lines: str   # All added lines joined — deletions excluded
+```
+
+### Class `GitPipeline`
+
+```python
+class GitPipeline:
+    def __init__(self, repo_path: str) -> None: ...
+```
+
+**Raises:** `GitPipelineError` if `repo_path` is not a valid Git repository.
+
+#### `repo_name() -> str`
+Returns the basename of the repository root directory.
+
+#### `current_branch() -> str`
+Returns the active branch name, or `"HEAD"` in detached HEAD state.
+
+#### `head_commit_sha() -> str`
+Returns the full SHA of the HEAD commit.
+**Raises:** `GitPipelineError` if the repository has no commits.
+
+#### `list_commits(max_count: int = 50) -> list[CommitRecord]`
+
+```python
+def list_commits(self, max_count: int = DEFAULT_MAX_COMMITS) -> list[CommitRecord]
+```
+
+Returns the `max_count` most recent commits from HEAD, newest first.
+**Raises:** `GitPipelineError` on Git failure; `ValueError` if `max_count < 1`.
+
+#### `get_commit_diff(commit_sha: str) -> list[FileDiff]`
+
+```python
+def get_commit_diff(self, commit_sha: str) -> list[FileDiff]
+```
+
+Returns added/modified lines per file in a commit. Files with only deletions are excluded.
+**Raises:** `GitPipelineError` for unknown SHA or diff failure.
+
+#### `get_commit_file_chunks(commit_sha: str, language: str) -> list[str]`
+
+```python
+def get_commit_file_chunks(self, commit_sha: str, language: str) -> list[str]
+```
+
+Returns AST/structural code chunks for files matching `language` in a commit.
+**Calls `abm.memory.chunking.chunk_stream_a_code_topologies()` directly — not reimplemented.**
+
+**Parameters:**
+- `commit_sha` — Full or abbreviated commit SHA.
+- `language` — One of `"dart"`, `"kotlin"`, `"python"`.
+
+**Returns:** Flat `list[str]` of code chunks across all matching files.
+**Raises:** `GitPipelineError`; `ValueError` for unsupported language.
+
+#### `get_commit_telemetry_event(commit_sha: str) -> dict[str, Any]`
+
+```python
+def get_commit_telemetry_event(self, commit_sha: str) -> dict[str, Any]
+```
+
+Returns a dict for Stream C ingestion with exactly these keys:
+
+```python
+{
+    "epoch_timestamp": int,           # authored_date as Unix int
+    "active_repository": str,         # repo_name()
+    "device_source": "dynamic_mobile_node",
+    "text": str,                      # "git commit <sha8>: <message>"
+    "sha": str,                       # full hexsha
+}
+```
+
+**Raises:** `GitPipelineError` for unknown SHA.
+
+---
+
+## Module: `abm.companion.code_structure_analyzer`
+
+**File:** [`abm/companion/code_structure_analyzer.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/companion/code_structure_analyzer.py)
+
+General-purpose code structure analyzer built on the v0.1 Stream A chunking contract.
+It does not modify `abm.memory.chunking.chunk_stream_a_code_topologies()`.
+
+### Constants
+
+| Constant | Type | Value |
+|----------|------|-------|
+| `SUPPORTED_STRUCTURE_LANGUAGES` | `frozenset[str]` | `{"dart", "kotlin", "python"}` |
+
+### Dataclass `CodeStructureNode`
+
+```python
+@dataclass
+class CodeStructureNode:
+    kind: str
+    name: str
+    start_line: int
+    end_line: int
+    text: str
+    identifiers: list[str]
+```
+
+Represents one parsed class/function/structural unit.
+
+### Dataclass `CodeStructureAnalysis`
+
+```python
+@dataclass
+class CodeStructureAnalysis:
+    language: str
+    chunks: list[str]
+    nodes: list[CodeStructureNode]
+    identifiers: list[str]
+    imports: list[str]
+    formatting_patterns: dict[str, Any]
+    architectural_preferences: dict[str, Any]
+```
+
+`identifiers` preserves frequency so naming-convention extraction can detect repeated habits.
+
+### Class `CodeStructureAnalyzer`
+
+#### `analyze(code: str, language: str) -> CodeStructureAnalysis`
+
+```python
+def analyze(self, code: str, language: str) -> CodeStructureAnalysis
+```
+
+Parses code into chunks, structure nodes, identifiers, imports, formatting patterns, and architectural preferences.
+
+**Raises:** `ValueError` for empty code or unsupported `language`.
+
+### Function `analyze_code_structure(code: str, language: str) -> CodeStructureAnalysis`
+
+```python
+def analyze_code_structure(code: str, language: str) -> CodeStructureAnalysis
+```
+
+Convenience wrapper around `CodeStructureAnalyzer().analyze(...)`.
+
+---
+
+## Module: `abm.companion.style_fingerprint`
+
+**File:** [`abm/companion/style_fingerprint.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/companion/style_fingerprint.py)
+
+### Exceptions
+
+```python
+class StyleExtractionError(ValueError): ...
+```
+Raised when `extract()` cannot produce a valid fingerprint. Subclasses `ValueError`.
+
+### Constants
+
+| Constant | Type | Value |
+|----------|------|-------|
+| `MIN_IDENTIFIER_COUNT` | `int` | `5` |
+
+### Dataclass `StyleFingerprint`
+
+```python
+@dataclass
+class StyleFingerprint:
+    language: str
+    framework: str
+    state_pattern: str
+    naming_convention: str
+    camel_case_ratio: float
+    identifier_count: int
+    formatting_patterns: dict[str, Any]
+    architectural_preferences: dict[str, Any]
+```
+
+> [!NOTE]
+> `camel_case_ratio`, `identifier_count`, `formatting_patterns`, and
+> `architectural_preferences` are **never stored in ChromaDB metadata**.
+> They are diagnostic fields for observability and Stream A document text only.
+
+### Class `StyleFingerprintExtractor`
+
+#### `extract(code: str, language: str) -> StyleFingerprint`
+
+```python
+def extract(self, code: str, language: str) -> StyleFingerprint
+```
+
+Analyses `code` and returns a `StyleFingerprint`.
+
+Uses `CodeStructureAnalyzer` for structural parsing, identifier frequency,
+formatting patterns, imports, and architecture signals.
+
+**Parameters:**
+- `code` — Non-empty source code to analyse.
+- `language` — One of `"dart"`, `"kotlin"`, `"python"`.
+
+**Raises:**
+- `StyleExtractionError` — if `code` is empty or whitespace-only.
+- `ValueError` — if `language` is not one of the three supported values.
+
+**Detection logic:**
+- **Python** — uses `ast.parse()` for identifier extraction; falls back to regex on `SyntaxError`.
+- **Dart** — regex identifier extraction; BLoC/Flutter import patterns detected (`flutter_bloc`, `extends Bloc<`).
+- **Kotlin** — regex identifier extraction; returns `("flutter", "bloc")` defaults (project context).
+- **Naming convention** — counts camelCase (`[a-z]...[A-Z]...`) vs snake_case (`word_word`) identifiers. If `< MIN_IDENTIFIER_COUNT` multi-word identifiers found, defaults to `"camelCase"`.
+
+#### `to_stream_a_metadata(fingerprint: StyleFingerprint) -> dict[str, str]`
+
+```python
+def to_stream_a_metadata(self, fingerprint: StyleFingerprint) -> dict[str, str]
+```
+
+Converts a `StyleFingerprint` into the **exact four-field Stream A metadata dict** from spec section 3.
+Ready to pass directly to `ChromaController.add_document()`.
+
+**Returns:**
+```python
+{
+    "language": str,            # fingerprint.language
+    "framework": str,           # fingerprint.framework
+    "state_pattern": str,       # fingerprint.state_pattern
+    "naming_convention": "camelCase",  # always — Stream A schema Literal
+}
+```
+
+> [!IMPORTANT]
+> This dict contains **only** the four fields. No extra keys are ever added.
+> `naming_convention` is always `"camelCase"` (the only value accepted by
+> `CodeTopologiesMetadata`). Detected snake_case stays on the fingerprint
+> object and in `to_stream_a_document()` text — never in ChromaDB metadata.
+> Validated against `SCHEMA_CODE_TOPOLOGIES` key set in the v0.2 regression gate.
+
+#### `to_stream_a_document(fingerprint: StyleFingerprint) -> str`
+
+```python
+def to_stream_a_document(self, fingerprint: StyleFingerprint) -> str
+```
+
+Renders the full style fingerprint into text for Stream A embedding.
+Formatting and architectural diagnostics are included in this text, not in metadata.
+
+---
+
+## Module: `abm.companion.ingestion_coordinator`
+
+**File:** [`abm/companion/ingestion_coordinator.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/companion/ingestion_coordinator.py)
+
+> [!IMPORTANT]
+> `IngestionCoordinator` is the **only** class in v0.2 that calls `ChromaController.add_document()`.
+> No other v0.2 module writes to ChromaDB.
+
+### Constants
+
+| Constant | Type | Description |
+|----------|------|-------------|
+| `_EXT_TO_LANGUAGE` | `dict[str, str]` | Maps file extension → language string for ingestion routing |
+
+### Dataclass `IngestionResult`
+
+```python
+@dataclass
+class IngestionResult:
+    status: str            # "ok" | "skipped" | "error"
+    collection: str        # Collection name that was written to / attempted
+    doc_ids: list[str]     # IDs of documents written. Empty on "skipped"/"error".
+    reason: str            # Human-readable explanation. Empty on "ok".
+```
+
+### Class `IngestionCoordinator`
+
+```python
+class IngestionCoordinator:
+    def __init__(
+        self,
+        controller: ChromaController,
+        embedder: OllamaEmbeddingWrapper,
+        git_pipeline: GitPipeline | None = None,
+    ) -> None: ...
+```
+
+**Parameters:**
+- `controller` — The v0.1 `ChromaController`. **All ChromaDB writes go through this object.**
+- `embedder` — The v0.1 `OllamaEmbeddingWrapper`. All embeddings route to `127.0.0.1:11434`.
+- `git_pipeline` — Optional `GitPipeline`. If `None`, Git-based ingestion methods return skipped results.
+
+#### `ingest_file_change(event: FileChangeEvent) -> IngestionResult`
+
+```python
+def ingest_file_change(self, event: FileChangeEvent) -> IngestionResult
+```
+
+Processes a `FileChangeEvent` from the file watcher.
+
+| Event condition | Action |
+|-----------------|--------|
+| `event_type == "deleted"` | Returns `status="skipped"` — nothing to embed |
+| `event.is_code_file == True` | Reads file, chunks via v0.1 `chunk_stream_a_code_topologies()`, fingerprints, embeds, writes to **Stream A**. Also writes file-change event to **Stream C**. |
+| `event.is_code_file == False` | Writes a single telemetry event to **Stream C** only. |
+
+**Never raises.** All errors are captured into `IngestionResult.status = "error"`.
+
+#### `ingest_code_fingerprint(code: str, language: str, context_id: str = "manual") -> IngestionResult`
+
+```python
+def ingest_code_fingerprint(
+    self,
+    code: str,
+    language: str,
+    context_id: str = "manual",
+) -> IngestionResult
+```
+
+Derives a style fingerprint from source code and writes one document to **Stream A**.
+The document text includes naming, formatting, and architectural diagnostics.
+The metadata dict contains exactly the existing Stream A fields:
+`language`, `framework`, `state_pattern`, `naming_convention`.
+
+**Never writes to Stream B, C, or D. Never adds metadata fields.**
+
+#### `ingest_git_commit(commit_sha: str, language: str) -> IngestionResult`
+
+```python
+def ingest_git_commit(self, commit_sha: str, language: str) -> IngestionResult
+```
+
+Ingests code from a single Git commit into Stream A and logs one telemetry event to Stream C.
+
+- Calls `GitPipeline.get_commit_file_chunks()` → which calls v0.1 `chunk_stream_a_code_topologies`.
+- Each chunk is fingerprinted via `StyleFingerprintExtractor`, embedded, and written to **Stream A**.
+- One commit event is written to **Stream C** via `GitPipeline.get_commit_telemetry_event()`.
+- **Never writes to Stream B or D.**
+
+Returns `status="skipped"` if `git_pipeline` is `None` or no chunks are produced.
+**Never raises.**
+
+#### `ingest_git_tree(language: str, max_commits: int = 50) -> list[IngestionResult]`
+
+```python
+def ingest_git_tree(
+    self,
+    language: str,
+    max_commits: int = DEFAULT_MAX_COMMITS,
+) -> list[IngestionResult]
+```
+
+Ingests the last `max_commits` commits from HEAD. Calls `ingest_git_commit()` per commit.
+Returns one `IngestionResult` per commit in reverse-chronological order.
+**Never raises.**
+
+### Internal: `_doc_id(prefix: str, content: str) -> str` *(static)*
+
+```python
+@staticmethod
+def _doc_id(prefix: str, content: str) -> str
+```
+
+Generates a stable, unique document ID from a sanitised prefix and the first 12 hex characters
+of a SHA-256 hash of `content`. Identical content always produces the same ID — makes
+`add_document` calls **idempotent** (upsert behaviour).
+
+---
+
+## Module: `abm.companion` (package)
+
+**File:** [`abm/companion/__init__.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/companion/__init__.py)
+
+```python
+from abm.companion import (
+    WorkspaceFileWatcher,
+    FileChangeEvent,
+    GitPipeline,
+    GitPipelineError,
+    CommitRecord,
+    FileDiff,
+    CodeStructureAnalyzer,
+    CodeStructureAnalysis,
+    CodeStructureNode,
+    analyze_code_structure,
+    StyleFingerprintExtractor,
+    StyleFingerprint,
+    StyleExtractionError,
+    IngestionCoordinator,
+    IngestionResult,
+)
+```
+
+All public v0.2 classes and dataclasses are re-exported at the package level.
+
+---
+
+## Constants Reference (v0.2)
+
+### From `abm.companion.file_watcher`
+
+| Constant | Type | Value |
+|----------|------|-------|
+| `CODE_EXTENSIONS` | `frozenset[str]` | `{".py", ".dart", ".kt", ".java", ".js", ".css", ".html"}` |
+| `DEVICE_SOURCE` | `str` | `"dynamic_mobile_node"` |
+| `DEFAULT_DEBOUNCE_SECONDS` | `float` | `1.0` |
+
+### From `abm.companion.git_pipeline`
+
+| Constant | Type | Value |
+|----------|------|-------|
+| `DEFAULT_MAX_COMMITS` | `int` | `50` |
+| `DEVICE_SOURCE` | `str` | `"dynamic_mobile_node"` |
+
+### From `abm.companion.code_structure_analyzer`
+
+| Constant | Type | Value |
+|----------|------|-------|
+| `SUPPORTED_STRUCTURE_LANGUAGES` | `frozenset[str]` | `{"dart", "kotlin", "python"}` |
+
+### From `abm.companion.style_fingerprint`
+
+| Constant | Type | Value |
+|----------|------|-------|
+| `MIN_IDENTIFIER_COUNT` | `int` | `5` |
+
+---
+
+## Test Suite
+
+**Files:**
+- [`tests/test_phase_v01_gate.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_phase_v01_gate.py) — **Phase v0.1 hard gate**
+- [`tests/test_memory_isolation.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_memory_isolation.py)
+- [`tests/test_metadata_and_chunking.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_metadata_and_chunking.py)
+- [`tests/test_phase_v02_gate.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_phase_v02_gate.py) — **Phase v0.2 hard gate**
+
+**v0.2 gate only (must be 100% green before v0.3):**
+```bash
+python -m pytest tests/test_phase_v02_gate.py -v
+```
+
+**Full suite:**
+```bash
+python -m pytest tests/ -v
+```
+### v0.2 Gate: `test_phase_v02_gate.py`
+
+*Updated by Antigravity for ABM 2.0 Phase v0.2. Update this file whenever new functions or schemas are added.*
+
+---
+
+## Phase v0.3 - Executive Orchestrator Engine
+
+Phase v0.3 defines routing, department worker sandbox scope, and JSON delegation schemas only.
+It does not build Phase v0.4 Docker sandboxes, compiler loops, or confidence-gate math.
+
+---
+
+## Module: `abm.orchestrator.departments`
+
+**File:** [`abm/orchestrator/departments.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/orchestrator/departments.py)
+
+### Enum `Department`
+
+```python
+class Department(str, Enum):
+    SOFTWARE_ENGINEERING = "software_engineering"
+    STRATEGIC_PLANNING = "strategic_planning"
+    ARCHITECTURE = "architecture"
+    SECURITY = "security"
+    MEMORY_INDEXING = "memory_indexing"
+```
+
+### Tool Constants
+
+```python
+TOOL_CHROMA_QUERY = "chroma_query"
+TOOL_CODE_STRUCTURE_ANALYZER = "code_structure_analyzer"
+TOOL_STYLE_FINGERPRINT_EXTRACTOR = "style_fingerprint_extractor"
+TOOL_GIT_PIPELINE = "git_pipeline"
+TOOL_FILE_WATCHER = "file_watcher"
+TOOL_INGESTION_COORDINATOR = "ingestion_coordinator"
+TOOL_MODEL_GATEWAY = "model_gateway"
+TOOL_SECURITY_STATIC_SCAN = "security_static_scan"
+TOOL_PATCH_PROPOSAL_WRITER = "patch_proposal_writer"
+TOOL_STRATEGIC_SUMMARY_BUILDER = "strategic_summary_builder"
+ALL_WORKER_TOOLS: frozenset[str]
+```
+
+### Dataclass `DepartmentWorkerSandbox`
+
+```python
+@dataclass(frozen=True)
+class DepartmentWorkerSandbox:
+    department: Department
+    allowed_streams: frozenset[str]
+    allowed_tools: frozenset[str]
+    execution_context_id: str
+    autonomy_level: int
+    assigned_agents: tuple[str, ...]
+    hard_success_conditions: tuple[str, ...]
+    description: str
+```
+
+Represents an isolated department execution context. `allowed_streams` must be a subset of the four v0.1 collection constants. `allowed_tools` must be a subset of `ALL_WORKER_TOOLS`. `execution_context_id` is stable and formatted as `sandbox:<department>`.
+
+```python
+def can_access_stream(self, collection_name: str) -> bool
+def can_use_tool(self, tool_name: str) -> bool
+```
+
+### Registry `DEPARTMENT_REGISTRY`
+
+```python
+DEPARTMENT_REGISTRY: dict[Department, DepartmentWorkerSandbox]
+```
+
+| Department | Streams | Tools | Autonomy |
+|------------|---------|-------|----------|
+| `software_engineering` | Stream A, B, C | `chroma_query`, `code_structure_analyzer`, `style_fingerprint_extractor`, `git_pipeline`, `patch_proposal_writer` | `2` |
+| `strategic_planning` | Stream D, B | `chroma_query`, `model_gateway`, `strategic_summary_builder` | `1` |
+| `architecture` | Stream A, D, B | `chroma_query`, `code_structure_analyzer`, `model_gateway`, `patch_proposal_writer` | `2` |
+| `security` | Stream B, C | `chroma_query`, `security_static_scan`, `git_pipeline` | `1` |
+| `memory_indexing` | Stream D, A, B, C | `chroma_query`, `file_watcher`, `git_pipeline`, `ingestion_coordinator` | `0` |
+
+```python
+def get_sandbox(department: Department) -> DepartmentWorkerSandbox
+def department_from_string(value: str) -> Department
+```
+
+---
+
+## Module: `abm.orchestrator.task_contract`
+
+**File:** [`abm/orchestrator/task_contract.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/orchestrator/task_contract.py)
+
+### Class `TaskContract`
+
+```python
+class TaskContract(BaseModel):
+    contract_id: str
+    objective: str
+    department: Department
+    assigned_agents: list[str]
+    autonomy_permission_level: int
+    hard_success_conditions: list[str]
+    created_at: int
+```
+
+Spec section 5 delegation contract. `extra="forbid"`.
+
+```python
+def to_dict(self) -> dict[str, Any]
+
+@classmethod
+def build(
+    cls,
+    objective: str,
+    department: Department,
+    assigned_agents: list[str],
+    autonomy_permission_level: int,
+    hard_success_conditions: list[str],
+    epoch: int | None = None,
+) -> TaskContract
+```
+
+### Class `RouterResult`
+
+```python
+class RouterResult(BaseModel):
+    contract: TaskContract
+    raw_classification: str
+    confidence_hint: str
+    model_used: str
+    routing_latency_ms: int
+    fallback_used: bool = False
+```
+
+Complete output of `ClassificationRouter.classify()`. `extra="forbid"`.
+
+```python
+def to_dict(self) -> dict[str, Any]
+```
+
+### Class `WorkerTaskHandoff`
+
+Router -> worker task handoff JSON schema.
+
+```python
+class WorkerTaskHandoff(BaseModel):
+    contract: TaskContract
+    execution_context_id: str
+    allowed_streams: list[str]
+    allowed_tools: list[str]
+```
+
+`extra="forbid"`. `execution_context_id` must start with `sandbox:`. `allowed_tools` must be known tool constants.
+
+```python
+def to_dict(self) -> dict[str, Any]
+
+@classmethod
+def build(cls, contract: TaskContract) -> WorkerTaskHandoff
+```
+
+`build()` copies `allowed_streams`, `allowed_tools`, and `execution_context_id` from the contract department's `DepartmentWorkerSandbox`.
+
+### Class `WorkerResultReport`
+
+Worker -> router result-reporting JSON schema.
+
+```python
+class WorkerResultReport(BaseModel):
+    contract_id: str
+    department: Department
+    execution_context_id: str
+    status: Literal["success", "failed", "blocked"]
+    summary: str
+    artifacts: list[str]
+    streams_accessed: list[str]
+    tools_used: list[str]
+    success_conditions_met: list[str]
+    error_message: str
+    completed_at: int
+```
+
+`extra="forbid"`. `contract_id` must start with `TXN_`; `execution_context_id` must start with `sandbox:`; `summary` must be non-empty; `tools_used` must be known tool constants.
+
+```python
+def to_dict(self) -> dict[str, Any]
+def validate_against_handoff(self, handoff: WorkerTaskHandoff) -> bool
+
+@classmethod
+def build(
+    cls,
+    handoff: WorkerTaskHandoff,
+    status: Literal["success", "failed", "blocked"],
+    summary: str,
+    artifacts: list[str] | None = None,
+    streams_accessed: list[str] | None = None,
+    tools_used: list[str] | None = None,
+    success_conditions_met: list[str] | None = None,
+    error_message: str = "",
+    completed_at: int | None = None,
+) -> WorkerResultReport
+```
+
+`validate_against_handoff()` returns `False` if the report escapes the handoff's contract id, department, execution context, allowed streams, allowed tools, or hard success conditions.
+
+---
+
+## Module: `abm.orchestrator` (package)
+
+**File:** [`abm/orchestrator/__init__.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/orchestrator/__init__.py)
+
+```python
+from abm.orchestrator import (
+    Department,
+    DepartmentWorkerSandbox,
+    DEPARTMENT_REGISTRY,
+    ALL_WORKER_TOOLS,
+    get_sandbox,
+    department_from_string,
+    TaskContract,
+    RouterResult,
+    WorkerTaskHandoff,
+    WorkerResultReport,
+)
+```
+
+---
+
+## Phase v0.3 Test Gate
+
+**Gate run command (must be 100% green before v0.4):**
+```bash
+python -m pytest tests/test_phase_v03_gate.py -v
+```
+
+### Hard gate proofs
+
+| Class | Proves |
+|-------|--------|
+| `TestRouterClassificationOnlyGate` | Router has no content-generation or worker-invocation methods; `classify()` returns `RouterResult` only; module never imports `WorkerTaskHandoff` / `WorkerResultReport` |
+| `TestWorkerSandboxScopeIsolationGate` | Exhaustive per-department stream/tool allow+deny via `can_access_stream` / `can_use_tool`; handoff scope matches sandbox; foreign stream/tool reports fail `validate_against_handoff` |
+| `TestDelegationAndReportSchemaGate` | Valid `TaskContract` / `WorkerTaskHandoff` / `WorkerResultReport` JSON round-trips; malformed payloads (extra fields, bad prefixes, unknown tools, empty summary, invalid status) raise `ValidationError` |
+
+### Supporting contract coverage
+
+| Class | Proves |
+|-------|--------|
+| `TestDepartmentRegistry` | Stream/tool scope and stable `sandbox:<dept>` execution context IDs |
+| `TestDepartmentWorkerSandbox` | Autonomy bounds, frozen sandboxes, helper methods |
+| `TestWorkerTaskHandoffSchema` / `TestWorkerResultReportSchema` | Handoff and report field shapes |
+| `TestClassificationRouterNeverGenerates` | Banned generate/write/respond/explain/complete methods |
+| `TestClassificationRouterClassify` / Fallback / BadJSON | Routing behaviour and never-raise contract |
+| `TestV01V02V03RegressionGate` | All previous phase constants and schemas unchanged |
+
+---
+
+## Phase v0.4 — Safe Action Sandbox
+
+> [!IMPORTANT]
+> The sandbox modules manage isolated code execution in ephemeral Docker containers, enforcing the mathematical Validation Gate defined in spec section 6.
+
+---
+
+## Module: `abm.sandbox.models`
+
+**File:** [`abm/sandbox/models.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/sandbox/models.py)
+
+### Pydantic Model `ExecutionResult`
+
+Represents the result of a command run inside the sandbox.
+
+```python
+class ExecutionResult(BaseModel):
+    exit_code: int
+    stdout: str
+    stderr: str
+    execution_time_ms: int
+```
+
+### Pydantic Model `ValidationScores`
+
+The five math parameters used in the Confidence Gate.
+
+```python
+class ValidationScores(BaseModel):
+    m_align: float      # Memory Alignment
+    t_correct: float    # Technical Syntax Validation
+    s_val: float        # Security Verification
+    test_succ: float    # Isolated Test Success
+    p_align: float      # Preference Alignment
+```
+
+### Pydantic Model `GateResult`
+
+The outcome of the Multi-Factor Validation Gate.
+
+```python
+class GateResult(BaseModel):
+    passed: bool
+    confidence_score: float
+    reason: str
+    quarantine_flag: bool = False
+    quarantine_path: str | None = None
+```
+
+---
+
+## Module: `abm.sandbox.container`
+
+**File:** [`abm/sandbox/container.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/sandbox/container.py)
+
+### Class `DockerSandbox`
+
+Context manager for ephemeral Docker container lifecycles.
+
+```python
+class DockerSandbox:
+    def __init__(self, image: str = "python:3.11-slim", timeout_seconds: int = 60) -> None: ...
+    def __enter__(self) -> "DockerSandbox": ...
+    def __exit__(self, exc_type, exc_val, exc_tb) -> None: ...
+
+    def write_file(self, container_path: str, content: str) -> None
+    def execute_command(self, command: str | list[str]) -> ExecutionResult
+```
+
+---
+
+## Module: `abm.sandbox.execution_loop`
+
+**File:** [`abm/sandbox/execution_loop.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/sandbox/execution_loop.py)
+
+### Class `SandboxCheckLoop`
+
+Injects code files and executes tests or compilers inside a sandbox.
+
+```python
+class SandboxCheckLoop:
+    def __init__(self, sandbox_factory: Callable[[], DockerSandbox]) -> None: ...
+    def evaluate_code(self, code_files: dict[str, str], test_command: str | list[str]) -> ExecutionResult
+```
+
+---
+
+## Module: `abm.sandbox.validation_gate`
+
+**File:** [`abm/sandbox/validation_gate.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/sandbox/validation_gate.py)
+
+### Class `MultiFactorGate`
+
+Enforces the absolute governance formula from ABM_SPEC section 6.
+
+```python
+class MultiFactorGate:
+    def __init__(self, quarantine_dir: str = "memory/ambiguity_quarantine") -> None: ...
+
+    def calculate_confidence_score(self, scores: ValidationScores) -> float
+    def evaluate_floor_gates(self, scores: ValidationScores) -> list[str]
+    def should_quarantine(
+        self, confidence_score: float, floor_gate_breaches: list[str]
+    ) -> bool
+    
+    def evaluate(
+        self, contract: TaskContract, scores: ValidationScores, payload: str
+    ) -> GateResult
+```
+
+- **Formula**: `C = 0.3(m_align) + 0.25(t_correct) + 0.2(s_val) + 0.15(test_succ) + 0.1(p_align)`
+- **Threshold**: `C >= 0.85`
+- **Floor Gates**: `s_val >= 0.80`, `test_succ >= 0.90`
+- **Quarantine**: If `C < 0.85` or any floor gate is breached, `evaluate()` returns `GateResult(quarantine_flag=True)` and writes `quarantine_TXN_...txt` to the `memory/ambiguity_quarantine/` directory.
+
+---
+
+## Module: `abm.sandbox` (package)
+
+**File:** [`abm/sandbox/__init__.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/sandbox/__init__.py)
+
+Re-exports `ExecutionResult`, `ValidationScores`, `GateResult`, `DockerSandbox`, `SandboxCheckLoop`, `MultiFactorGate`.
+
+---
+
+### v0.4 Gate: `test_phase_v04_gate.py`
+
+**Gate run command (must be 100% green before v0.5):**
+```bash
+python -m pytest tests/test_phase_v04_gate.py -v
+```
+
+### Hard gate proofs
+
+| Class | Proves |
+|-------|--------|
+| `TestSandboxIsolationTeardownGate` | Fresh container per run; stop+remove+close on exit; teardown on execute errors; `network_mode=none`; no shared write state across sequential `SandboxCheckLoop` runs |
+| `TestCompilerTestCheckRejectionGate` | Compile/test failures return non-zero `exit_code` (not rewritten to success); failed checks still tear down the sandbox |
+| `TestConfidenceFormulaExactGate` | `C = 0.30M+0.25T+0.20S+0.15Test+0.10P` exact across inputs; boundaries at `S=0.80`, `Test=0.90`, `C=0.85` (pass) and just-below (quarantine) |
+| `TestFloorBreachQuarantinesHighCGate` | `S_val < 0.80` or `Test_succ < 0.90` quarantines even when `C ≥ 0.85`; high-C with floors met is accepted |
+
+### Supporting contract coverage
+
+| Class | Proves |
+|-------|--------|
+| `TestDockerSandbox` | Context manager lifecycle, tar file injection, execute_command |
+| `TestExecutionLoop` | Code injection then test command happy path |
+| `TestValidationGateMath` / `TestValidationFloorGates` / `TestValidationQuarantine` | Formula, floors, quarantine file content |
+| `TestV01V02V03RegressionGate` | Hard-asserts zero state or constraint drift from `v0.1`, `v0.2`, `v0.3` |
+
+---
+
+## Phase v0.5 — FirstMinds Strategic Wing
+
+> [!IMPORTANT]
+> The Strategic Wing modules track corporate decisions and aggregate workflow states. They strictly adhere to the rule of not modifying core v0.1–v0.4 functionality, relying purely on existing interfaces and data shapes.
+
+---
+
+## Module: `abm.strategic_wing.decision_journal`
+
+**File:** [`abm/strategic_wing/decision_journal.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/strategic_wing/decision_journal.py)
+
+### Class `DecisionJournal`
+
+Writes durable records of strategic decisions to Stream D (`abm_cognitive_identity`).
+
+```python
+class DecisionJournal:
+    def __init__(self, controller: ChromaController, embedder: OllamaEmbeddingWrapper) -> None: ...
+    
+    def log_decision(
+        self, what_decided: str, why_decided: str, epoch: int | None = None
+    ) -> str
+```
+
+- Embeds the reasoning directly into the document `text` matrix to comply with the strict, immutable `SCHEMA_COGNITIVE_IDENTITY`.
+- Generates a custom `doc_id` with format `DECISION_{epoch}_{uuid}`.
+
+---
+
+## Module: `abm.strategic_wing.workflow_monitor`
+
+**File:** [`abm/strategic_wing/workflow_monitor.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/strategic_wing/workflow_monitor.py)
+
+### Enum `TaskState`
+
+```python
+class TaskState(Enum):
+    ROUTED = "ROUTED"
+    IN_SANDBOX = "IN_SANDBOX"
+    EXECUTED = "EXECUTED"
+    QUARANTINED = "QUARANTINED"
+    PASSED = "PASSED"
+```
+
+### Dataclass `TaskRecord`
+
+```python
+@dataclass
+class TaskRecord:
+    contract: TaskContract
+    state: TaskState
+    execution_result: ExecutionResult | None = None
+    gate_result: GateResult | None = None
+```
+
+### Class `WorkflowMonitor`
+
+Read-side aggregation registry tracking task state across the orchestrator and sandbox. Does not run active threads; depends on push registration from callers and lazy-evaluation of the quarantine disk layer.
+
+```python
+class WorkflowMonitor:
+    def __init__(self, quarantine_dir: str = "memory/ambiguity_quarantine") -> None: ...
+    
+    def register_routed_task(self, contract: TaskContract) -> None
+    def mark_in_sandbox(self, contract_id: str) -> None
+    def record_execution(self, contract_id: str, result: ExecutionResult) -> None
+    def record_gate_result(self, contract_id: str, gate: GateResult) -> None
+    def scan_quarantine_directory(self) -> list[str]
+    def get_overview_report(self) -> str
+```
+
+- **`get_overview_report()`**: Emits a human-readable summary of all registered tasks.
+- **`scan_quarantine_directory()`**: Physically scans the disk for `quarantine_TXN_*.txt` to automatically sync the state of offline or previously quarantined tasks into the registry.
+
+---
+
+## Module: `abm.strategic_wing.strategic_asset_analyzer`
+
+**File:** [`abm/strategic_wing/strategic_asset_analyzer.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/strategic_wing/strategic_asset_analyzer.py)
+
+Read-only strategic analyzer that maps company-direction queries into options using the existing memory streams. It performs analysis only and never calls `ChromaController.add_document()` or `DecisionJournal.log_decision()`.
+
+### Constants
+
+```python
+STREAM_LABELS: dict[str, str]
+```
+
+Maps each canonical collection name to its stream label.
+
+### Dataclass `StrategicContextItem`
+
+```python
+@dataclass(frozen=True)
+class StrategicContextItem:
+    collection_name: str
+    document_id: str
+    text: str
+    metadata: dict[str, Any]
+    distance: float | None = None
+```
+
+### Dataclass `StrategicOption`
+
+```python
+@dataclass(frozen=True)
+class StrategicOption:
+    title: str
+    rationale: str
+    supporting_streams: list[str]
+    evidence: list[StrategicContextItem]
+    tradeoffs: list[str]
+    next_questions: list[str]
+```
+
+### Dataclass `StrategicAnalysisResult`
+
+```python
+@dataclass(frozen=True)
+class StrategicAnalysisResult:
+    query: str
+    context_items: list[StrategicContextItem]
+    options: list[StrategicOption]
+    decision_recorded: bool = False
+```
+
+`decision_recorded` is always `False`; decision persistence belongs to `DecisionJournal`.
+
+### Class `StrategicAssetAnalyzer`
+
+```python
+class StrategicAssetAnalyzer:
+    def __init__(
+        self,
+        controller: ChromaController,
+        embedder: OllamaEmbeddingWrapper,
+        collections: tuple[str, ...] = ALL_COLLECTIONS,
+    ) -> None: ...
+
+    def analyze(
+        self, query: str, n_results_per_stream: int = 3
+    ) -> StrategicAnalysisResult
+
+    def retrieve_context(
+        self, query: str, n_results_per_stream: int = 3
+    ) -> list[StrategicContextItem]
+
+    def map_options(
+        self, query: str, context_items: list[StrategicContextItem]
+    ) -> list[StrategicOption]
+```
+
+- **`retrieve_context()`**: Embeds `query` through `OllamaEmbeddingWrapper.embed()` and calls `ChromaController.query_collection()` for each configured collection.
+- **`map_options()`**: Produces analysis-only option paths from Stream D, A, B, and C evidence.
+- **`analyze()`**: Returns `StrategicAnalysisResult` with mapped options. It never records or chooses a decision.
+
+---
+
+## Module: `abm.strategic_wing` (package)
+
+**File:** [`abm/strategic_wing/__init__.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/strategic_wing/__init__.py)
+
+Re-exports `DecisionJournal`, `WorkflowMonitor`, `TaskState`, `TaskRecord`, `StrategicAssetAnalyzer`, `StrategicContextItem`, `StrategicOption`, and `StrategicAnalysisResult`.
+
+---
+
+### v0.5 Gate: `test_phase_v05_gate.py`
+
+**Gate run command (must be 100% green before v1.0):**
+```bash
+python -m pytest tests/test_phase_v05_gate.py -v
+```
+
+### Hard gate proofs
+
+| Class | Proves |
+|-------|--------|
+| `TestDecisionJournalStreamDSchemaGate` | Journal metadata is exactly `SCHEMA_COGNITIVE_IDENTITY` (3 fields); validates via `CognitiveIdentityMetadata`; decision payload lives in text, not metadata |
+| `TestWorkflowMonitorReadOnlyGate` | Monitor never imports/calls orchestrator or sandbox write APIs; holds no router/sandbox/gate refs; lifecycle updates are local registry only |
+| `TestAnalyzerDecisionSeparationGate` | Analyzer never calls `add_document` / `DecisionJournal.log_decision`; `decision_recorded` stays `False`; recording requires a separate explicit journal call |
+
+### Supporting contract coverage
+
+| Class | Proves |
+|-------|--------|
+| `TestDecisionJournal` | Embeds decision text and writes Stream D |
+| `TestWorkflowMonitor` | Task lifecycle, quarantine scan, overview report |
+| `TestStrategicAssetAnalyzer` | Multi-stream retrieval and option mapping |
+| `TestV01V02V03V04RegressionGate` | Prior-phase constants unchanged |
+
+*Updated for ABM 2.0 Phase v0.5 hard gate. Update this file whenever new functions or schemas are added.*

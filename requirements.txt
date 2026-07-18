@@ -1,7 +1,15 @@
-# ABM 2.0 — Phase v0.1 Memory Brain Core
+# ABM 2.0 — Phase v0.2 Developer Companion Node
 # All inference and embeddings route through local Ollama at 127.0.0.1:11434.
 # No cloud LLM APIs permitted (spec section 4 mandate).
 
+# v0.1 — Memory Brain Core
 chromadb>=0.5.0
 pydantic>=2.0.0
 requests>=2.31.0
+
+# v0.2 — Developer Companion Node
+watchdog>=4.0.0      # cross-platform file-system events (ReadDirectoryChangesW / inotify)
+gitpython>=3.1.40    # local Git repo access — no network calls
+
+# v0.4 — Safe Action Sandbox
+docker>=7.0.0        # docker SDK for ephemeral sandboxes

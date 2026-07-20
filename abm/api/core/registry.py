@@ -40,6 +40,7 @@ from abm.orchestrator.model_gateway import OllamaModelGateway
 from abm.orchestrator.router import ClassificationRouter
 from abm.strategic_wing.strategic_asset_analyzer import StrategicAssetAnalyzer
 from abm.strategic_wing.workflow_monitor import WorkflowMonitor
+from abm.mobile.ambient_manager import AmbientInteractionManager, ManagerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +107,7 @@ class ServiceRegistry:
         self._router: ClassificationRouter | None = None
         self._monitor: WorkflowMonitor | None = None
         self._analyzer: StrategicAssetAnalyzer | None = None
+        self._ambient_manager: AmbientInteractionManager | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -178,6 +180,16 @@ class ServiceRegistry:
         )
         logger.info("ServiceRegistry: StrategicAssetAnalyzer ready.")
 
+        # 7. Ambient interaction manager — Stream C retention-aware write path (v1.0)
+        self._ambient_manager = AmbientInteractionManager(
+            controller=self._controller,
+            embedder=self._embedder,
+            config=ManagerConfig(
+                archive_persist_dir=self._config.chroma_persist_directory.rstrip("/") + "_archive",
+            ),
+        )
+        logger.info("ServiceRegistry: AmbientInteractionManager ready.")
+
         self._booted = True
         logger.info("ServiceRegistry: boot complete.")
 
@@ -192,6 +204,9 @@ class ServiceRegistry:
             return
         logger.info("ServiceRegistry: shutting down …")
         # Services in reverse dependency order
+        if self._ambient_manager is not None and self._ambient_manager.is_running:
+            self._ambient_manager.stop()
+        self._ambient_manager = None
         self._analyzer = None
         self._monitor = None
         self._router = None
@@ -302,6 +317,12 @@ class ServiceRegistry:
         self._require_booted("analyzer")
         assert self._analyzer is not None
         return self._analyzer
+
+    @property
+    def ambient_manager(self) -> AmbientInteractionManager:
+        self._require_booted("ambient_manager")
+        assert self._ambient_manager is not None
+        return self._ambient_manager
 
     @property
     def is_booted(self) -> bool:

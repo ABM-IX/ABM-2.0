@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  AndroidManifest.xml — ABM 2.0 Phase v1.0 Flutter Mobile Node
+  
+  Permissions required for the persistent Android Foreground Service
+  (via flutter_foreground_task). All permissions are the minimum necessary
+  for the Phase v1.0 ambient telemetry scope (Git trees, workspace files,
+  static design docs). No network permissions beyond local loopback,
+  no accessibility services, no microphone/clipboard.
+  
+  Architectural Constitution rule 1: local-first only.
+-->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- ────────────────────────────────────────────────────────────────────
+         PERMISSIONS
+         ──────────────────────────────────────────────────────────────────── -->
+
+    <!-- Required for flutter_foreground_task to start a foreground service -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+
+    <!-- Required on Android 14+ for foreground services with a specific type -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+
+    <!-- Required on Android 13+ to post the persistent notification -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Required for WakeLock (keeps CPU running during ambient monitoring) -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Required to receive the BOOT_COMPLETED broadcast for auto-restart -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Network access — local loopback only (no internet permission needed) -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <application
+        android:label="ABM 2.0"
+        android:name="${applicationName}"
+        android:icon="@mipmap/ic_launcher"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules">
+
+        <!-- Main Flutter activity -->
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop"
+            android:theme="@style/LaunchTheme"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true"
+            android:windowSoftInputMode="adjustResize">
+            <meta-data
+                android:name="io.flutter.embedding.android.NormalTheme"
+                android:resource="@style/NormalTheme" />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <!-- ────────────────────────────────────────────────────────────────
+             flutter_foreground_task: FlutterForegroundTaskService
+             
+             android:foregroundServiceType="dataSync" matches the
+             FOREGROUND_SERVICE_DATA_SYNC permission and is required on
+             Android 14+ for non-media foreground services.
+             ──────────────────────────────────────────────────────────────── -->
+        <service
+            android:name="com.pravera.flutter_foreground_task.service.ForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <!-- Boot receiver for auto-restart after device reboot -->
+        <receiver
+            android:name="com.pravera.flutter_foreground_task.receiver.BootReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.MY_PACKAGE_REPLACED" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Notification channel metadata (required for Android 8+) -->
+        <meta-data
+            android:name="com.pravera.flutter_foreground_task.notification_channel_id"
+            android:value="abm_foreground_service" />
+
+    </application>
+
+</manifest>

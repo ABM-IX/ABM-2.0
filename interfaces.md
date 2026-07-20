@@ -2541,3 +2541,708 @@ python -m pytest tests/ -v
 | `TestPriorPhaseRegressionGate` | v0.1–v0.5 collection names, department enum values, task state values, validation formula weights, and API config Ollama URL are all unchanged |
 
 *Updated for ABM 2.0 Phase v1.0. Update this file whenever new capabilities or schemas are added.*
+
+---
+
+## Phase v1.0 — Flutter Foreground Service & Ambient Interaction Manager
+
+> [!IMPORTANT]
+> This phase adds the ABM mobile node (Flutter/Android) and the Python-side
+> ambient interaction manager that feeds Stream C with retention-aware writes.
+> All v0.1–v0.5 modules are sealed and unchanged (PROJECT_BRIEF.md ground rule 2).
+
+---
+
+### Updated File Map (v1.0 mobile additions)
+
+```
+ABM-2.0/
+├── abm/
+│   ├── mobile/                                 # v1.0 — Ambient Interaction
+│   │   ├── __init__.py                         # Re-exports full public surface
+│   │   ├── event_models.py                     # AmbientEvent dataclass + PERMITTED_SOURCE_KINDS
+│   │   ├── stream_c_writer.py                  # StreamCWriter (retention-aware write path)
+│   │   ├── retention_housekeeper.py            # StreamCRetentionHousekeeper + lifecycle stages
+│   │   └── ambient_manager.py                  # AmbientInteractionManager + 3 sub-monitors
+│   └── api/
+│       ├── capabilities.py                     # + AmbientIngestionResult + ingestAmbientEvent
+│       ├── __init__.py                         # + re-exports for new symbols
+│       └── core/
+│           └── registry.py                     # + ambient_manager property (boot step 7)
+├── mobile/                                     # v1.0 — Flutter Mobile Node
+│   ├── pubspec.yaml
+│   ├── android/app/src/main/AndroidManifest.xml
+│   └── lib/
+│       ├── main.dart                           # Entry point + foreground task callback registration
+│       ├── app.dart                            # MultiBlocProvider root + dark Material 3 theme
+│       └── features/
+│           ├── foreground/
+│           │   ├── bloc/                       # ForegroundBloc + events + states
+│           │   ├── service/abm_foreground_service.dart
+│           │   └── ui/foreground_status_widget.dart
+│           └── telemetry/
+│               ├── bloc/                       # TelemetryBloc + events + states
+│               ├── models/ambient_event_model.dart
+│               └── repository/telemetry_repository.dart
+└── tests/
+    └── test_phase_v10_mobile_gate.py           # 48-test gate (all mocked)
+```
+
+---
+
+## Module: `abm.mobile.event_models`
+
+**File:** [`abm/mobile/event_models.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/mobile/event_models.py)
+
+### Constant `PERMITTED_SOURCE_KINDS`
+
+```python
+PERMITTED_SOURCE_KINDS: frozenset[str] = frozenset({
+    "git_commit",     # GitTreeMonitor
+    "workspace_file", # WorkspaceStateMonitor
+    "design_doc",     # DesignDocMonitor
+})
+```
+
+Exhaustive set of permitted ambient telemetry source kinds for Phase v1.0.
+Clipboard, voice, and browser are structurally absent — not runtime-gated.
+
+### Dataclass `AmbientEvent`
+
+```python
+@dataclass
+class AmbientEvent:
+    source_kind: str           # Must be in PERMITTED_SOURCE_KINDS
+    active_repository: str     # Git repo name (empty string if no repo)
+    source_path: str           # Absolute path of the artefact (constitution rule 3)
+    text: str                  # Non-empty human-readable event description
+    epoch_timestamp: int       # Defaults to int(time.time()) at construction
+    device_source: str         # Always "dynamic_mobile_node" (set in __post_init__)
+    extra: dict                # Optional diagnostics; never written to ChromaDB
+```
+
+`__post_init__` raises `ValueError` if `source_kind ∉ PERMITTED_SOURCE_KINDS` or `text` is empty/whitespace.
+`device_source` is always `"dynamic_mobile_node"` regardless of any kwarg.
+
+---
+
+## Module: `abm.mobile.stream_c_writer`
+
+**File:** [`abm/mobile/stream_c_writer.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/mobile/stream_c_writer.py)
+
+### Constant `COMPRESS_WINDOW_SECONDS`
+
+```python
+COMPRESS_WINDOW_SECONDS: int = 3_600   # 1 hour
+```
+
+### Dataclass `WriteResult`
+
+```python
+@dataclass
+class WriteResult:
+    status: str             # "ok" | "compressed" | "invalid" | "error"
+    doc_id: str = ""        # ChromaDB doc ID (empty on non-ok)
+    reason: str = ""        # Human-readable explanation (empty on "ok")
+    housekeeper_ran: bool = False
+```
+
+### Class `StreamCWriter`
+
+Retention-aware Stream C write path. **Never raises to callers.**
+
+```python
+class StreamCWriter:
+    def __init__(
+        self,
+        controller: ChromaController,
+        embedder: OllamaEmbeddingWrapper,
+        housekeeper: StreamCRetentionHousekeeper,
+        compress_window_seconds: int = COMPRESS_WINDOW_SECONDS,
+    ) -> None: ...
+
+    def write(self, event: AmbientEvent) -> WriteResult
+```
+
+**`write()` lifecycle stages:**
+
+| Stage | What |
+|-------|------|
+| 1 Capture | Receives `AmbientEvent`; checks `source_kind ∈ PERMITTED_SOURCE_KINDS` |
+| 2 Validate | Inline type checks on `epoch_timestamp`, `active_repository`, `device_source` |
+| 3 Compress | Dedup gate: `(source_kind, active_repository, sha256(text)[:16])` within `compress_window_seconds` → `"compressed"` |
+| 4 Store | Calls `ChromaController.add_document()` with **exactly 3 metadata fields**: `epoch_timestamp`, `active_repository`, `device_source` |
+| 5–7 Housekeeping | Calls `StreamCRetentionHousekeeper.run_if_due()` (rate-limited to once/hour) |
+
+**Metadata contract:** ChromaDB metadata written by `StreamCWriter` contains
+exactly `{epoch_timestamp, active_repository, device_source}`.  Extra diagnostic
+data (`source_kind`, `source_path`, `text_hash`) lives in the document text body only.
+
+> [!NOTE]
+> `active_repository` in the ChromaDB metadata field accepts **any** repo name.
+> The v0.1 `AmbientTelemetryMetadata` Pydantic model is NOT called directly
+> (it is scoped to a Literal of two project names). `StreamCWriter` performs
+> structural type validation instead, keeping the v0.1 model sealed.
+
+---
+
+## Module: `abm.mobile.retention_housekeeper`
+
+**File:** [`abm/mobile/retention_housekeeper.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/mobile/retention_housekeeper.py)
+
+### Constants
+
+```python
+COLLECTION_AMBIENT_ARCHIVE: str = "abm_ambient_telemetry_archive"
+SUMMARIZE_AFTER_DAYS: int = 14
+ARCHIVE_AFTER_DAYS: int = 30
+DELETE_AFTER_DAYS: int = 180
+HOUSEKEEPING_INTERVAL_SECONDS: int = 3_600   # 1 hour
+```
+
+### Dataclass `HousekeeperResult`
+
+```python
+@dataclass
+class HousekeeperResult:
+    summarized: int = 0
+    archived: int = 0
+    deleted: int = 0
+    skipped: bool = False
+    error: str = ""
+```
+
+### Class `StreamCRetentionHousekeeper`
+
+Implements MEMORY_LIFECYCLE_POLICY.md lifecycle stages 5–7 for Stream C.
+
+```python
+class StreamCRetentionHousekeeper:
+    def __init__(
+        self,
+        controller: ChromaController,
+        embedder: OllamaEmbeddingWrapper,
+        archive_persist_dir: str = "./memory/chroma_archive",
+        housekeeping_interval_seconds: int = HOUSEKEEPING_INTERVAL_SECONDS,
+    ) -> None: ...
+
+    def run_if_due(self) -> HousekeeperResult
+    def force_run(self, now_epoch: int | None = None) -> HousekeeperResult
+```
+
+**Stage assignments:**
+
+| Stage | Trigger | Action |
+|-------|---------|--------|
+| 5 Summarize | Entry age ≥ `SUMMARIZE_AFTER_DAYS` (14d) with `lifecycle_stage="raw"` | Write summary doc to Stream C; mark originals `lifecycle_stage="summarized"` |
+| 6 Archive | Entry age ≥ `ARCHIVE_AFTER_DAYS` (30d) with `lifecycle_stage="summarized"` | Write to `abm_ambient_telemetry_archive` (separate `ArchiveController`); delete from hot-path |
+| 7 Delete | Entry age ≥ `DELETE_AFTER_DAYS` (180d) with any raw stage | Hard-delete from hot-path; summary retained |
+
+**Cold archive:** Uses a **separate `ChromaController` instance** pointing to
+`archive_persist_dir`, keeping the v0.1 controller sealed.
+
+- **`run_if_due()`**: Runs at most once per `housekeeping_interval_seconds`. Never raises.
+- **`force_run(now_epoch)`**: Bypasses the interval guard (for tests / manual ops).
+
+---
+
+## Module: `abm.mobile.ambient_manager`
+
+**File:** [`abm/mobile/ambient_manager.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/mobile/ambient_manager.py)
+
+### Telemetry scope (Phase v1.0 guardrail)
+
+| Source | Monitor | `source_kind` |
+|--------|---------|---------------|
+| Git commits | `GitTreeMonitor` (wraps `GitPipeline`) | `git_commit` |
+| Non-code workspace files | `WorkspaceStateMonitor` (wraps `WorkspaceFileWatcher`) | `workspace_file` |
+| Static design docs | `DesignDocMonitor` (one-shot scan) | `design_doc` |
+
+**OFFLINE (not implemented):** Clipboard, voice, browser — absent structurally.
+
+### Constant `DESIGN_DOC_EXTENSIONS`
+
+```python
+DESIGN_DOC_EXTENSIONS: frozenset[str] = frozenset(
+    {".md", ".txt", ".rst", ".yaml", ".yml", ".json", ".toml"}
+)
+```
+
+### Dataclass `ManagerConfig`
+
+```python
+@dataclass
+class ManagerConfig:
+    watch_paths: list[str] = field(default_factory=list)
+    design_doc_paths: list[str] = field(default_factory=list)
+    git_repo_path: str | None = None
+    archive_persist_dir: str = "./memory/chroma_archive"
+    debounce_seconds: float = 1.0
+    git_poll_interval_seconds: int = 60
+```
+
+### Class `GitTreeMonitor`
+
+```python
+class GitTreeMonitor:
+    def __init__(
+        self, git_pipeline: GitPipeline, on_event: Callable[[AmbientEvent], None]
+    ) -> None: ...
+    def poll(self) -> int    # Returns number of new commit events emitted
+```
+
+- Polling-based (not event-driven). Initialises `_last_sha` on first call without emitting (avoids replaying history).
+
+### Class `WorkspaceStateMonitor`
+
+```python
+class WorkspaceStateMonitor:
+    def __init__(
+        self,
+        watch_paths: list[str],
+        on_event: Callable[[AmbientEvent], None],
+        debounce_seconds: float = 1.0,
+    ) -> None: ...
+    def start(self) -> None
+    def stop(self) -> None
+```
+
+- Wraps `WorkspaceFileWatcher`; forwards only `DESIGN_DOC_EXTENSIONS` paths.
+- Code changes are ignored here (already handled by v0.2 `IngestionCoordinator` → Stream A).
+
+### Class `DesignDocMonitor`
+
+```python
+class DesignDocMonitor:
+    def __init__(
+        self,
+        scan_paths: list[str],
+        on_event: Callable[[AmbientEvent], None],
+        extensions: frozenset[str] | None = None,
+    ) -> None: ...
+    def scan(self) -> int    # Returns number of events emitted
+```
+
+- One-shot recursive scanner. Called by `AmbientInteractionManager.start()`.
+
+### Class `AmbientInteractionManager`
+
+```python
+class AmbientInteractionManager:
+    def __init__(
+        self,
+        controller: ChromaController,
+        embedder: OllamaEmbeddingWrapper,
+        config: ManagerConfig | None = None,
+    ) -> None: ...
+
+    def start(self) -> None           # One-shot design-doc scan + start workspace watcher
+    def stop(self) -> None            # Stop workspace watcher
+    def poll_git(self) -> int         # Poll for new commits if interval elapsed
+    def ingest_event(self, event: AmbientEvent) -> WriteResult
+    @property def is_running(self) -> bool
+```
+
+- All events from all three monitors route through a single shared `StreamCWriter` instance.
+- `stop()` is idempotent.
+- `poll_git()` is rate-limited by `ManagerConfig.git_poll_interval_seconds`.
+
+---
+
+## Module: `abm.mobile` (package)
+
+**File:** [`abm/mobile/__init__.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/mobile/__init__.py)
+
+Re-exports `AmbientInteractionManager`, `ManagerConfig`, `GitTreeMonitor`,
+`WorkspaceStateMonitor`, `DesignDocMonitor`, `AmbientEvent`, `StreamCWriter`,
+`StreamCRetentionHousekeeper`, `WriteResult`, `HousekeeperResult`, and all constants.
+
+---
+
+## Flutter Encrypted Cross-Node Sync Channel
+
+The Flutter mobile node encrypts sync payloads before sending them to the
+desktop daemon. It uses the Dart `cryptography` package with AES-256-GCM and
+stores the symmetric key through `flutter_secure_storage`, which delegates to
+Android Keystore / iOS Keychain. No custom cipher or custom key-exchange scheme
+is implemented.
+
+### `mobile/pubspec.yaml`
+
+Required packages:
+
+```yaml
+cryptography: ^2.7.0
+flutter_secure_storage: ^9.2.2
+```
+
+### `SyncHandshake`
+
+**File:** [`mobile/lib/features/sync/models/sync_handshake.dart`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/mobile/lib/features/sync/models/sync_handshake.dart)
+
+```dart
+const int kSyncProtocolVersion = 1;
+const String kSyncAlgorithm = 'AES-256-GCM';
+const String kSyncContentTypeJson = 'application/json';
+
+class SyncHandshake {
+  final int protocolVersion;
+  final String nodeId;
+  final String keyId;
+  final String algorithm;
+  final int createdAtEpoch;
+  final List<String> capabilities;
+
+  Map<String, dynamic> toJson();
+  factory SyncHandshake.fromJson(Map<String, dynamic> json);
+}
+```
+
+**Handshake payload format:**
+
+```json
+{
+  "protocol_version": 1,
+  "node_id": "dynamic_mobile_node",
+  "key_id": "base64url-truncated-sha256",
+  "algorithm": "AES-256-GCM",
+  "created_at_epoch": 1784370192,
+  "capabilities": ["ambient_event_ingest", "state_snapshot", "encrypted_payload_v1"]
+}
+```
+
+The handshake advertises protocol version, node identity, key identity,
+algorithm, timestamp, and supported capabilities. It does not transmit key
+material and does not negotiate keys with custom cryptography.
+
+### `EncryptedSyncPayload`
+
+**File:** [`mobile/lib/features/sync/models/encrypted_sync_payload.dart`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/mobile/lib/features/sync/models/encrypted_sync_payload.dart)
+
+```dart
+class EncryptedSyncPayload {
+  final int protocolVersion;
+  final String keyId;
+  final String algorithm;
+  final String nodeId;
+  final int createdAtEpoch;
+  final String contentType;
+  final String nonce;       // base64 AES-GCM nonce
+  final String ciphertext;  // base64 encrypted body
+  final String mac;         // base64 AES-GCM authentication tag
+
+  Map<String, dynamic> toJson();
+  factory EncryptedSyncPayload.fromJson(Map<String, dynamic> json);
+}
+```
+
+**Encrypted payload format:**
+
+```json
+{
+  "protocol_version": 1,
+  "key_id": "base64url-truncated-sha256",
+  "algorithm": "AES-256-GCM",
+  "node_id": "dynamic_mobile_node",
+  "created_at_epoch": 1784370192,
+  "content_type": "application/json",
+  "nonce": "base64-nonce",
+  "ciphertext": "base64-ciphertext",
+  "mac": "base64-authentication-tag"
+}
+```
+
+Associated authenticated data is derived from
+`abm-sync|protocol_version|key_id|node_id|created_at_epoch|content_type`.
+Changing any of those fields causes AES-GCM authentication failure during
+decrypt.
+
+### `CrossNodeKeyStore`
+
+**File:** [`mobile/lib/features/sync/crypto/cross_node_key_store.dart`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/mobile/lib/features/sync/crypto/cross_node_key_store.dart)
+
+```dart
+const String kCrossNodeSyncKeyStorageKey = 'abm_cross_node_sync_aes_gcm_key';
+const String kCrossNodeSyncKeyIdStorageKey = 'abm_cross_node_sync_key_id';
+
+class CrossNodeKeyMaterial {
+  final SecretKey secretKey;
+  final String keyId;
+}
+
+class CrossNodeKeyStore {
+  CrossNodeKeyStore({FlutterSecureStorage? storage, AesGcm? algorithm});
+
+  Future<CrossNodeKeyMaterial> ensureKey();
+  Future<CrossNodeKeyMaterial?> readKey();
+  Future<CrossNodeKeyMaterial> rotateKey();
+  Future<void> clearKey();
+}
+```
+
+`ensureKey()` creates an AES-256-GCM key using `AesGcm.with256bits()` when no
+stored key exists, persists it through `flutter_secure_storage`, and derives
+`keyId` from SHA-256 using `cryptography`.
+
+### `SyncCryptoChannel`
+
+**File:** [`mobile/lib/features/sync/crypto/sync_crypto_channel.dart`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/mobile/lib/features/sync/crypto/sync_crypto_channel.dart)
+
+```dart
+const List<String> kSyncCapabilities = [
+  'ambient_event_ingest',
+  'state_snapshot',
+  'encrypted_payload_v1',
+];
+
+class SyncCryptoChannel {
+  SyncCryptoChannel({
+    required CrossNodeKeyStore keyStore,
+    required String nodeId,
+    AesGcm? algorithm,
+  });
+
+  Future<SyncHandshake> buildHandshake({int? createdAtEpoch});
+  Future<EncryptedSyncPayload> encryptJson(
+    Map<String, dynamic> json, {
+    int? createdAtEpoch,
+    String contentType = kSyncContentTypeJson,
+  });
+  Future<Map<String, dynamic>> decryptJson(EncryptedSyncPayload payload);
+}
+```
+
+`encryptJson()` and `decryptJson()` delegate AES-GCM operations to
+`package:cryptography`.
+
+### `CrossNodeSyncRepository`
+
+**File:** [`mobile/lib/features/sync/repository/cross_node_sync_repository.dart`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/mobile/lib/features/sync/repository/cross_node_sync_repository.dart)
+
+```dart
+const String kDefaultSyncBaseUrl = 'http://127.0.0.1:8765';
+const String kSyncHandshakeEndpoint = '/api/sync/handshake';
+const String kSyncPayloadEndpoint = '/api/sync/payload';
+const Duration kSyncRequestTimeout = Duration(seconds: 10);
+
+class SyncSendResult {
+  final bool success;
+  final String? status;
+  final String? error;
+}
+
+class CrossNodeSyncRepository {
+  CrossNodeSyncRepository({
+    required String baseUrl,
+    required SyncCryptoChannel channel,
+    http.Client? httpClient,
+  });
+
+  Future<SyncSendResult> sendHandshake();
+  Future<SyncSendResult> sendEncryptedJson(Map<String, dynamic> json);
+  Future<Map<String, dynamic>> decryptPayload(EncryptedSyncPayload payload);
+  void dispose();
+}
+```
+
+`sendHandshake()` posts `SyncHandshake.toJson()` to `/api/sync/handshake`.
+`sendEncryptedJson()` encrypts the supplied JSON and posts
+`EncryptedSyncPayload.toJson()` to `/api/sync/payload`.
+
+---
+
+## API Layer extension: `ingestAmbientEvent`
+
+### `abm.api.capabilities`
+
+#### `ingestAmbientEvent(event, *, registry) → AmbientIngestionResult`
+
+```python
+def ingestAmbientEvent(
+    event: AmbientEvent,
+    *,
+    registry: ServiceRegistry,
+) -> AmbientIngestionResult
+```
+
+- **STATUS:** `stable`
+- **OWNER:** `abm.mobile.ambient_manager.AmbientInteractionManager`
+- **DEPENDENCIES:** `ServiceRegistry.ambient_manager` (→ controller + embedder)
+- **CONSUMERS:** Flutter foreground service (via local HTTP stub)
+
+Delegates to `AmbientInteractionManager.ingest_event()`. Never raises.
+
+#### Dataclass `AmbientIngestionResult`
+
+```python
+@dataclass
+class AmbientIngestionResult:
+    status: str             # "ok" | "compressed" | "invalid" | "error"
+    doc_id: str = ""
+    reason: str = ""
+    housekeeper_ran: bool = False
+    degraded: bool = False  # True if ambient_manager raised unexpectedly
+```
+
+### `abm.api.core.registry` — new service (boot step 7)
+
+```python
+@property
+def ambient_manager(self) -> AmbientInteractionManager: ...
+```
+
+Constructed in `boot()` after `StrategicAssetAnalyzer` (step 6). Config uses
+`chroma_persist_directory + "_archive"` as the cold archive path.
+`shutdown()` calls `ambient_manager.stop()` if running.
+
+---
+
+## Flutter Mobile Node
+
+### Plugin: `flutter_foreground_task: ^8.0.0`
+
+Device-agnostic persistent Android Foreground Service. Prevents OS low-memory
+killer from terminating the execution thread. Required permissions in
+`AndroidManifest.xml`:
+
+| Permission | Reason |
+|---|---|
+| `FOREGROUND_SERVICE` | Core foreground service |
+| `FOREGROUND_SERVICE_DATA_SYNC` | Android 14+ typed foreground service |
+| `POST_NOTIFICATIONS` | Android 13+ persistent notification |
+| `WAKE_LOCK` | Keeps CPU running during ambient monitoring |
+| `RECEIVE_BOOT_COMPLETED` | Auto-restart after device reboot |
+
+### `AbmForegroundService` singleton
+
+**File:** [`mobile/lib/features/foreground/service/abm_foreground_service.dart`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/mobile/lib/features/foreground/service/abm_foreground_service.dart)
+
+```dart
+class AbmForegroundService {
+    static final AbmForegroundService instance = AbmForegroundService._();
+    void init() → void
+    Future<void> start() → void    // raises ForegroundServiceStartException on failure
+    Future<void> stop() → void
+    Future<bool> get isRunning
+    void onDataReceived(void Function(Object) callback) → void
+    void removeDataCallback(void Function(Object) callback) → void
+}
+```
+
+Notification channel ID: `"abm_foreground_service"`. `autoRunOnBoot: true`.
+
+### `ForegroundBloc`
+
+**File:** [`mobile/lib/features/foreground/bloc/foreground_bloc.dart`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/mobile/lib/features/foreground/bloc/foreground_bloc.dart)
+
+```
+Events:  StartForegroundService | StopForegroundService | ForegroundServiceStatusUpdated
+States:  ForegroundInitial | ForegroundRunning | ForegroundStopped | ForegroundError(message)
+```
+
+### `TelemetryBloc`
+
+**File:** [`mobile/lib/features/telemetry/bloc/telemetry_bloc.dart`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/mobile/lib/features/telemetry/bloc/telemetry_bloc.dart)
+
+```
+Events:  ObserveWorkspaceFile | RecordGitActivity | ObserveDesignDoc
+States:  TelemetryIdle | TelemetrySending(sourceKind) | TelemetrySent(docId, status, sourceKind) | TelemetryFailed(error, sourceKind)
+```
+
+No event type exists for clipboard, voice, or browser — scope enforced at the Dart type level.
+
+### `AmbientEventModel` (Dart)
+
+**File:** [`mobile/lib/features/telemetry/models/ambient_event_model.dart`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/mobile/lib/features/telemetry/models/ambient_event_model.dart)
+
+```dart
+enum AmbientSourceKind { gitCommit, workspaceFile, designDoc }
+
+class AmbientEventModel {
+    final AmbientSourceKind sourceKind;
+    final String activeRepository;
+    final String sourcePath;
+    final String text;
+    final int epochTimestamp;
+    final String deviceSource;   // always "dynamic_mobile_node"
+
+    Map<String, dynamic> toJson() → ...
+    factory AmbientEventModel.fromJson(Map<String, dynamic>) → ...
+}
+```
+
+JSON field names match the Python `AmbientEvent` dataclass exactly.
+
+### `TelemetryRepository`
+
+**File:** [`mobile/lib/features/telemetry/repository/telemetry_repository.dart`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/mobile/lib/features/telemetry/repository/telemetry_repository.dart)
+
+```dart
+class TelemetryRepository {
+    TelemetryRepository({required String baseUrl, ...})
+    factory TelemetryRepository.defaultInstance()   // baseUrl = "http://127.0.0.1:8765"
+
+    Future<TelemetryResult> sendEvent(AmbientEventModel event) → never throws
+    Future<List<TelemetryResult>> sendBatch(List<AmbientEventModel> events)
+    void dispose()
+}
+```
+
+`kIngestEndpoint = "/api/ingest_ambient_event"`. Timeout: 10s. All failures returned
+as `TelemetryResult.success == false` (constitution rule 9 — degrade gracefully).
+
+---
+
+## Phase v1.0 Mobile Test Gate
+
+**File:** [`tests/test_phase_v10_mobile_gate.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_phase_v10_mobile_gate.py)
+
+**Gate run command:**
+```bash
+python -m pytest tests/test_phase_v10_mobile_gate.py -v
+```
+
+**Full regression:**
+```bash
+python -m pytest tests/ -v
+```
+
+### Hard gate proofs (54 tests — all mocked, no live Ollama required)
+
+| Class | Proves |
+|-------|--------|
+| `TestAmbientEventSchemaGate` | Only PERMITTED_SOURCE_KINDS accepted; clipboard/voice/browser/unknown raise ValueError; device_source always "dynamic_mobile_node"; empty text raises; epoch_timestamp defaults to positive int |
+| `TestStreamCWriterRetentionAwareGate` | Unique event → ok; duplicate within compress window → compressed; same event beyond window → ok; metadata has exactly 3 fields; embedding failure → error; ChromaDB failure → error; housekeeper called after ok; not called after compressed |
+| `TestRetentionHousekeeperLifecycleGate` | run_if_due skips before interval; runs after interval; force_run deletes past 180d; force_run summarizes past 14d; lifecycle constants match MEMORY_LIFECYCLE_POLICY |
+| `TestAmbientInteractionManagerScopeGate` | Git monitor None without repo; poll_git returns 0 without monitor; poll_git rate-limited; ingest permitted kind → ok/compressed; prohibited kind blocked at AmbientEvent construction; is_running False before start; design doc extensions correct |
+| `TestIngestAmbientEventCapabilityGate` | Returns AmbientIngestionResult; compressed status passed through; manager exception → degraded=True; STATUS tag is "stable"; OWNER names AmbientInteractionManager |
+| `TestEncryptedCrossNodeSyncGate` | Flutter sync declares `cryptography` and `flutter_secure_storage`; key store uses `AesGcm.with256bits()` and secure storage; channel uses AES-GCM encrypt/decrypt with AAD; handshake and encrypted payload fields are fixed |
+| `TestV01ToV10MobileRegressionGate` | All v0.1 collection names unchanged; PERMITTED_SOURCE_KINDS exactly 3; compress window 3600; housekeeping interval 3600; lifecycle thresholds 14/30/180; AmbientTelemetryMetadata has exactly 3 fields; archive collection name correct; device_source correct |
+
+*Updated for ABM 2.0 Phase v1.0 Flutter Foreground Service & Ambient Interaction Manager. Update this file whenever new capabilities, monitors, or schemas are added.*
+
+---
+
+## Phase v1.0 Roadmap Completion Gate
+
+**File:** [`tests/test_phase_v1_completion_gate.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_phase_v1_completion_gate.py)
+
+**Gate run command:**
+```bash
+python -m pytest tests/test_phase_v1_completion_gate.py -v
+```
+
+**Full roadmap regression:**
+```bash
+python -m pytest tests/ -v
+```
+
+### Hard gate proofs (36 tests — final roadmap gate)
+
+| Class | Proves |
+|-------|--------|
+| `TestForegroundServiceSurvivalGate` | No Tecno Spark 40 / hardware hardcoding; uses `flutter_foreground_task`; wake lock + boot restart + repeat heartbeat survive simulated low-memory trim |
+| `TestEncryptedSyncIntegrityGate` | Only `cryptography` + `flutter_secure_storage`; unencrypted payloads rejected; tampered ciphertext/MAC/AAD fail AES-GCM auth |
+| `TestAmbientManagerSourceAllowlistGate` | Only `git_commit`, `workspace_file`, `design_doc`; code files ignored; clipboard/voice/browser absent in Python + Dart + manifest |
+| `TestStreamCCompressionWindowGate` | Duplicates within 3600 s → `compressed`; after window → stored again; housekeeper summarizes past 14 d and deletes past 180 d |
+| `TestRoadmapRegressionGate` | All prior gates (`v0.1`–`v0.5`, Client #1, mobile gate) subprocess-verified still 100% green |

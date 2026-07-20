@@ -40,6 +40,8 @@ from typing import Any
 from abm.memory.chroma_controller import ALL_COLLECTIONS
 from abm.orchestrator.departments import DEPARTMENT_REGISTRY
 from abm.strategic_wing.strategic_asset_analyzer import StrategicAnalysisResult
+from abm.mobile.event_models import AmbientEvent
+from abm.mobile.stream_c_writer import WriteResult
 
 from .core.registry import ServiceRegistry
 
@@ -640,6 +642,90 @@ def explainAuditRecord(
 
 
 # ============================================================================
+# ── STABLE: Phase v1.0 — Ambient Interaction ─────────────────────────────────
+# ============================================================================
+
+
+@dataclass
+class AmbientIngestionResult:
+    """
+    Return type for ``ingestAmbientEvent``.
+
+    Attributes
+    ----------
+    status : str
+        ``"ok"`` | ``"compressed"`` | ``"invalid"`` | ``"error"``.
+    doc_id : str
+        ChromaDB document ID written (empty on non-ok statuses).
+    reason : str
+        Human-readable explanation (empty on ``"ok"``).
+    housekeeper_ran : bool
+        ``True`` if a retention housekeeping pass ran during this write.
+    degraded : bool
+        ``True`` if the manager was unavailable (Ollama down, etc.).
+    """
+
+    status: str
+    doc_id: str = ""
+    reason: str = ""
+    housekeeper_ran: bool = False
+    degraded: bool = False
+
+
+def ingestAmbientEvent(
+    event: "AmbientEvent",
+    *,
+    registry: ServiceRegistry,
+) -> AmbientIngestionResult:
+    """
+    Write a single ambient interaction event to Stream C.
+
+    STATUS       : stable
+    OWNER        : abm.mobile.ambient_manager.AmbientInteractionManager
+    DEPENDENCIES : ServiceRegistry.ambient_manager (-> controller + embedder)
+    CONSUMERS    : Flutter foreground service (via local HTTP stub)
+
+    Delegates to ``AmbientInteractionManager.ingest_event()``, which runs
+    the full retention-aware write path (validate → compress → store →
+    housekeeping).  Source must be one of ``PERMITTED_SOURCE_KINDS``:
+    ``git_commit``, ``workspace_file``, ``design_doc``.
+
+    Clipboard, voice, and browser sources are not permitted in Phase v1.0
+    (PROJECT_BRIEF.md ground rule 8).
+
+    Never raises to the caller.
+
+    Parameters
+    ----------
+    event : AmbientEvent
+        The ambient event to persist.
+    registry : ServiceRegistry
+        Booted service registry.
+
+    Returns
+    -------
+    AmbientIngestionResult
+    """
+    try:
+        manager = registry.ambient_manager
+        write_result = manager.ingest_event(event)
+        return AmbientIngestionResult(
+            status=write_result.status,
+            doc_id=write_result.doc_id,
+            reason=write_result.reason,
+            housekeeper_ran=write_result.housekeeper_ran,
+            degraded=False,
+        )
+    except Exception as exc:
+        logger.error("ingestAmbientEvent: unexpected error: %s", exc)
+        return AmbientIngestionResult(
+            status="error",
+            reason=str(exc),
+            degraded=True,
+        )
+
+
+# ============================================================================
 # ── FUTURE CAPABILITIES ──────────────────────────────────────────────────────
 # Documented stubs only. No backend exists. See ARCHITECTURE_BACKLOG.md.
 # A console command may ONLY be added the day its backend phase is gated.
@@ -730,6 +816,7 @@ __all__ = [
     "StatusResult",
     "MemoryResult",
     "ExplainResult",
+    "AmbientIngestionResult",
     # Stable capabilities
     "answerQuestion",
     "retrieveKnowledge",
@@ -737,6 +824,7 @@ __all__ = [
     "summarizeProject",
     "aggregateProjectMemory",
     "explainAuditRecord",
+    "ingestAmbientEvent",
     # Future capabilities (stubs)
     "continueTask",
     "reflectOnWork",

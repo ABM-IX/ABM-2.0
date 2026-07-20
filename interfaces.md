@@ -25,6 +25,7 @@
     - [Module: `abm.companion.code_structure_analyzer`](#module-abmcompanion-code_structure_analyzer)
     - [Module: `abm.companion.style_fingerprint`](#module-abmcompanion-style_fingerprint)
     - [Module: `abm.companion.ingestion_coordinator`](#module-abmcompanion-ingestion_coordinator)
+    - [Module: `abm.companion.watch_daemon`](#module-abmcompanion-watch_daemon)
     - [Module: `abm.companion` (package)](#module-abmcompanion-package)
     - [Constants Reference (v0.2)](#constants-reference-v02)
 11. [Phase v0.3 — Executive Orchestrator Engine](#phase-v03--executive-orchestrator-engine)
@@ -66,7 +67,8 @@ ABM-2.0/
 │       ├── git_pipeline.py            # GitPython commit/diff/branch reader
 │       ├── code_structure_analyzer.py # General-purpose AST/structure analyzer
 │       ├── style_fingerprint.py       # AST-based style analyzer
-│       └── ingestion_coordinator.py   # Pipeline coordinator → calls v0.1 API
+│       ├── ingestion_coordinator.py   # Pipeline coordinator → calls v0.1 API
+│       └── watch_daemon.py            # Runnable entry point — watcher → coordinator
 │   └── orchestrator/                  # v0.3 — Executive Orchestrator Engine
 │       ├── __init__.py                # Re-exports all v0.3 public symbols
 │       ├── departments.py             # Department enum + sandbox configs
@@ -756,6 +758,51 @@ Isolation gate uses real `ChromaController(in_memory=True)` (EphemeralClient). E
 | `CODE_EXTENSIONS` | `frozenset[str]` | `{".py", ".dart", ".kt", ".java", ".js", ".css", ".html"}` |
 | `DEVICE_SOURCE` | `str` | `"dynamic_mobile_node"` |
 | `DEFAULT_DEBOUNCE_SECONDS` | `float` | `1.0` |
+| `EXCLUDED_DIRS` | `frozenset[str]` | See table below |
+| `EXCLUDED_EXTENSIONS` | `frozenset[str]` | See table below |
+
+#### `EXCLUDED_DIRS` — directory segments always ignored
+
+Matched against **every component** of an incoming path (using `Path.parts`),
+so a segment anywhere in the tree (e.g. `deep/__pycache__/foo.pyc`) is
+correctly excluded.
+
+| Segment | Reason |
+|---------|--------|
+| `__pycache__` | Python bytecode cache |
+| `.git` | Git internal objects/refs |
+| `.hg` | Mercurial metadata |
+| `.svn` | Subversion metadata |
+| `.tox` | tox virtual-environment artefacts |
+| `.venv` / `venv` / `.env` / `env` | Virtual-environment directories |
+| `node_modules` | JavaScript package tree |
+| `.pytest_cache` | pytest internal cache |
+| `.mypy_cache` | mypy type-check cache |
+| `.ruff_cache` | ruff linter cache |
+| `dist` / `build` | Python / JS build output |
+| `.eggs` | setuptools egg directory |
+| `__pypackages__` | PEP 582 local packages |
+| `.DS_Store` | macOS Finder metadata (dir form) |
+| `Thumbs.db` | Windows thumbnail cache (dir form) |
+
+#### `EXCLUDED_EXTENSIONS` — file suffixes always ignored
+
+Matched against `Path(path).suffix.lower()`.
+
+| Extension | Reason |
+|-----------|--------|
+| `.pyc` / `.pyo` | Compiled Python bytecode |
+| `.pyd` | Windows Python extension module (compiled) |
+| `.pyi` | Type-stub files (not runnable source) |
+| `.egg` / `.whl` | Python distribution archives |
+| `.so` / `.dll` / `.exe` | Compiled native binaries |
+| `.o` | C/C++ object file |
+| `.class` | JVM bytecode |
+| `.log` | Log files (generated output) |
+| `.lock` | Lock files (e.g. `poetry.lock` — metadata, not source) |
+| `.DS_Store` | macOS Finder metadata (file form) |
+| `.swp` / `.swo` | Vim swap files |
+| `.tmp` / `.bak` / `.orig` | Temporary / backup / merge artefacts |
 
 ### Dataclass `FileChangeEvent`
 
@@ -773,6 +820,10 @@ class FileChangeEvent:
 
 `device_source`, `extension`, and `is_code_file` are set automatically in `__post_init__`.
 Only `path`, `event_type`, `epoch_timestamp`, `repository` are constructor parameters.
+
+> [!NOTE]
+> `FileChangeEvent` is only ever constructed **after** `_is_excluded()` has
+> returned `False`. Excluded paths are dropped before event construction.
 
 ### Class `WorkspaceFileWatcher`
 
@@ -811,6 +862,32 @@ def watch_paths(self) -> list[str]       # Paths being monitored (copy)
 @property
 def debounce_seconds(self) -> float      # Debounce window in seconds
 ```
+
+### Internal: `_is_excluded(path: str) -> bool`
+
+```python
+def _is_excluded(path: str) -> bool
+```
+
+**Single authoritative exclusion gate.** Returns `True` if the path must be
+silently ignored. Called inside `_DebounceHandler._schedule()` — the earliest
+possible intercept point — so excluded paths:
+
+- never enter the debounce pending queue,
+- never trigger a debounce timer,
+- never reach `on_code_change` or `on_telemetry_event`,
+- and are **never ingested into any stream** (A, B, C, or D).
+
+**Exclusion triggers (either is sufficient):**
+1. `Path(path).suffix.lower()` is in `EXCLUDED_EXTENSIONS`.
+2. Any segment in `Path(path).parts` is in `EXCLUDED_DIRS`.
+
+Dropped events are logged at `DEBUG` level:
+```
+FileWatcher excluded (not ingested): <path>
+```
+
+**Returns:** `True` → drop; `False` → proceed normally.
 
 ### Internal: `_infer_repository(file_path: str) -> str`
 
@@ -1221,6 +1298,115 @@ def _doc_id(prefix: str, content: str) -> str
 Generates a stable, unique document ID from a sanitised prefix and the first 12 hex characters
 of a SHA-256 hash of `content`. Identical content always produces the same ID — makes
 `add_document` calls **idempotent** (upsert behaviour).
+
+---
+
+## Module: `abm.companion.watch_daemon`
+
+**File:** [`abm/companion/watch_daemon.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/companion/watch_daemon.py)
+
+Runnable entry point that wires `WorkspaceFileWatcher` directly to `IngestionCoordinator`.
+This is the only module in v0.2 that owns a daemon lifecycle — everything else is a library.
+
+> [!IMPORTANT]
+> `watch_daemon` is **not** imported by `abm.companion.__init__`. It is an executable
+> entry point only. Import the component classes directly from `abm.companion` instead.
+
+### Run command
+
+```bash
+python -m abm.companion.watch_daemon --path <directory> [options]
+```
+
+### CLI flags
+
+| Flag | Type | Default | Description |
+|------|------|---------|-------------|
+| `--path DIR` | `str` (repeatable) | *(required)* | Directory to watch recursively. Repeat for multiple paths. |
+| `--debounce SECONDS` | `float` | `1.0` | Debounce window forwarded to `WorkspaceFileWatcher`. |
+| `--chroma-dir DIR` | `str` | `./memory/chroma_store` | ChromaDB persistence directory. |
+| `--ollama-url URL` | `str` | `http://127.0.0.1:11434` | Ollama base URL. |
+| `--git-path DIR` | `str` | `None` | Optional Git repo path for `GitPipeline`. Omit to run without Git support. |
+| `--log-level LEVEL` | `str` | `INFO` | `DEBUG`\|`INFO`\|`WARNING`\|`ERROR`. |
+
+### Public functions
+
+#### `build_coordinator(chroma_dir, ollama_url, git_path) -> IngestionCoordinator`
+
+```python
+def build_coordinator(
+    chroma_dir: str,
+    ollama_url: str,
+    git_path: str | None,
+) -> IngestionCoordinator
+```
+
+Constructs the full v0.1+v0.2 object graph:
+`ChromaController` → `OllamaEmbeddingWrapper` → `GitPipeline` (optional) → `IngestionCoordinator`.
+
+If `git_path` is provided but fails `GitPipeline` init, the warning is logged and the
+coordinator runs without Git support. File-change ingestion is unaffected.
+
+**Never raises.**
+
+---
+
+#### `run_daemon(watch_paths, coordinator, debounce_seconds) -> NoReturn`
+
+```python
+def run_daemon(
+    watch_paths: list[str],
+    coordinator: IngestionCoordinator,
+    debounce_seconds: float,
+) -> NoReturn
+```
+
+Wires `WorkspaceFileWatcher` to `IngestionCoordinator` and blocks until SIGINT or SIGTERM.
+
+Constructor call (verbatim from spec):
+
+```python
+WorkspaceFileWatcher(
+    watch_paths=watch_paths,                      # list[str]
+    on_code_change=Callable[[FileChangeEvent], None],     # -> Stream A
+    on_telemetry_event=Callable[[FileChangeEvent], None], # -> Stream C
+    debounce_seconds=debounce_seconds,            # float
+)
+```
+
+Both callbacks call `coordinator.ingest_file_change(event)` and print one confirmation
+line to stdout per event (see output format below).
+
+---
+
+#### `main(argv=None) -> None`
+
+```python
+def main(argv: list[str] | None = None) -> None
+```
+
+CLI entry point. Resolves paths, calls `build_coordinator()`, then `run_daemon()`.
+Registered as `__main__` so `python -m abm.companion.watch_daemon` works directly.
+
+---
+
+### Stdout confirmation format
+
+A single line is printed to stdout (or stderr on error) for every event processed:
+
+```
+[ok     ] Stream A [code]       modified   abm/companion/file_watcher.py  (3 chunk(s))
+[skipped] Stream C [telemetry]  deleted    some/file.txt  -- Deleted file -- nothing to embed
+[error  ] Stream A [code]       created    broken.py  -- Cannot read file: ...
+```
+
+| Column | Values |
+|--------|--------|
+| Status tag | `[ok     ]` \| `[skipped]` \| `[error  ]` |
+| Stream label | `Stream A [code]` \| `Stream C [telemetry]` \| `Stream B [docs]` \| `Stream D [identity]` |
+| Event type | `created` \| `modified` \| `deleted` |
+| Path | Path relative to cwd where possible |
+| Detail | Chunk count on ok; reason on skipped/error |
 
 ---
 
@@ -1898,3 +2084,460 @@ python -m pytest tests/test_phase_v05_gate.py -v
 | `TestV01V02V03V04RegressionGate` | Prior-phase constants unchanged |
 
 *Updated for ABM 2.0 Phase v0.5 hard gate. Update this file whenever new functions or schemas are added.*
+
+---
+
+## Phase v1.0 — API Layer & Capability Catalogue
+
+> [!IMPORTANT]
+> This section IS the capability catalogue. No separate deliverable exists.
+> Every capability the ABM engine exposes to any client is documented here with
+> its `STATUS`, `OWNER`, `DEPENDENCIES`, and `CONSUMERS` — the four fields that
+> make this a living contract (Architectural Constitution rules 13 and 14).
+
+---
+
+### Updated File Map (v1.0 additions)
+
+```
+ABM-2.0/
+├── abm/
+│   ├── api/                                  # v1.0 — API Layer
+│   │   ├── __init__.py                       # Re-exports full public surface
+│   │   ├── capabilities.py                   # All capabilities, status-tagged
+│   │   └── core/
+│   │       ├── __init__.py                   # Re-exports APIConfig, ServiceRegistry, HealthStatus
+│   │       ├── config.py                     # APIConfig dataclass
+│   │       └── registry.py                   # ServiceRegistry (boot/shutdown/health_check)
+│   └── clients/
+│       └── console/                          # v1.0 — Client #1: Console
+│           ├── __init__.py
+│           ├── commands.py                   # cmd_* handlers → API
+│           ├── formatter.py                  # Terminal output formatters
+│           └── main.py                       # CLI entry point (argparse)
+├── tests/
+│   └── test_phase_v10_gate.py               # Hard gate: API + console (49 tests)
+```
+
+---
+
+## Module: `abm.api.core.config`
+
+**File:** [`abm/api/core/config.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/api/core/config.py)
+
+### Dataclass `APIConfig`
+
+```python
+@dataclass
+class APIConfig:
+    chroma_persist_directory: str = "./memory/chroma_store"
+    ollama_base_url: str = "http://127.0.0.1:11434"
+    embedding_model: str = "nomic-embed-text"
+    classification_model: str = "phi3:mini"
+    quarantine_dir: str = "memory/ambiguity_quarantine"
+    connect_timeout: float = 5.0
+    read_timeout: float = 30.0
+    n_retrieval_results: int = 5
+```
+
+All defaults match the v0.1–v0.5 module constants. Create one instance at startup
+and pass it to `ServiceRegistry`. Do not mutate after boot.
+
+---
+
+## Module: `abm.api.core.registry`
+
+**File:** [`abm/api/core/registry.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/api/core/registry.py)
+
+### Dataclass `HealthStatus`
+
+```python
+@dataclass
+class HealthStatus:
+    ollama_reachable: bool
+    chroma_ready: bool
+    degraded: bool
+    notes: list[str]
+```
+
+### Class `ServiceRegistry`
+
+Boot / service-registration / shutdown lifecycle manager. Holds lazily-initialised
+singletons for every service the capability functions depend on.
+
+```python
+class ServiceRegistry:
+    def __init__(self, config: APIConfig | None = None) -> None: ...
+
+    def boot(self) -> None
+    def shutdown(self) -> None
+    def health_check(self) -> HealthStatus
+
+    # Read-only service accessors (raise RuntimeError before boot())
+    @property def config(self) -> APIConfig
+    @property def controller(self) -> ChromaController
+    @property def embedder(self) -> OllamaEmbeddingWrapper
+    @property def gateway(self) -> OllamaModelGateway
+    @property def router(self) -> ClassificationRouter
+    @property def monitor(self) -> WorkflowMonitor
+    @property def analyzer(self) -> StrategicAssetAnalyzer
+    @property def is_booted(self) -> bool
+```
+
+**Boot order (dependency-first):**
+1. `ChromaController` (v0.1)
+2. `OllamaEmbeddingWrapper` (v0.1)
+3. `OllamaModelGateway` (v0.3)
+4. `ClassificationRouter` (v0.3 — depends on gateway + controller + embedder)
+5. `WorkflowMonitor` (v0.5)
+6. `StrategicAssetAnalyzer` (v0.5)
+
+**Design note:** This is NOT a formal DI/IoC container — that is an
+ARCHITECTURE_BACKLOG candidate. This is plain shared-instance management with
+lifecycle discipline sufficient for the current single-client scope.
+
+**`health_check()` contract:** Never raises. Returns `HealthStatus(degraded=True)`
+if Ollama is unreachable or ChromaDB is not ready. (Constitution rule 9.)
+
+**Usage:**
+```python
+config = APIConfig()
+registry = ServiceRegistry(config)
+registry.boot()
+# … use registry.router, registry.embedder, etc. …
+registry.shutdown()
+```
+
+---
+
+## Module: `abm.api.capabilities`
+
+**File:** [`abm/api/capabilities.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/api/capabilities.py)
+
+> This module IS the capability catalogue. Each function is tagged with
+> `STATUS`, `OWNER`, `DEPENDENCIES`, and `CONSUMERS`.
+
+### Status taxonomy
+
+| Tag | Meaning |
+|-----|---------|
+| `stable` | Tested, gated v0.1–v0.5 backend exists; wired to a console command now. |
+| `experimental` | Built but not yet wired to any client. (None today.) |
+| `future` | Documented stub only. `NotImplementedError`. Backend has no phase brief yet. |
+
+---
+
+### Return types
+
+```python
+@dataclass
+class AnswerResult:
+    question: str
+    department: str          # Department enum value string
+    confidence: str          # "high" | "medium" | "low"
+    hits: list[dict]         # {id, text, collection, distance, metadata}
+    fallback_used: bool
+    degraded: bool
+
+@dataclass
+class KnowledgeResult:
+    query: str
+    hits: list[dict]         # {id, text, collection, distance, metadata}
+    degraded: bool
+
+@dataclass
+class StatusResult:
+    overview: str
+    quarantined_ids: list[str]
+    ollama_reachable: bool
+    chroma_ready: bool
+    degraded: bool
+
+@dataclass
+class MemoryResult:
+    project_name: str
+    streams: dict[str, list[dict]]   # collection_name → hits
+    total_hits: int
+    degraded: bool
+
+@dataclass
+class ExplainResult:
+    target: str
+    found: bool
+    records: list[dict]     # {source: "monitor"|"decision_journal", ...}
+    notes: str
+```
+
+---
+
+### ── STABLE Capabilities ────────────────────────────────────────────────────
+
+#### `answerQuestion(question, *, registry, n_results=None) → AnswerResult`
+
+```python
+def answerQuestion(
+    question: str,
+    *,
+    registry: ServiceRegistry,
+    n_results: int | None = None,
+) -> AnswerResult
+```
+
+- **STATUS:** `stable`
+- **OWNER:** `abm.orchestrator.router.ClassificationRouter`
+- **DEPENDENCIES:** `ServiceRegistry.router`, `ServiceRegistry.embedder`, `ServiceRegistry.controller`
+- **CONSUMERS:** console `ask` command
+
+Classifies the question to a `Department` (v0.3 router), then queries only
+that department's `allowed_streams` for relevant memory hits. Degrades
+gracefully when Ollama is unreachable (`fallback_used=True`, empty hits,
+`degraded=True`). Never raises to caller.
+
+---
+
+#### `retrieveKnowledge(query, *, registry, n_results=None) → KnowledgeResult`
+
+```python
+def retrieveKnowledge(
+    query: str,
+    *,
+    registry: ServiceRegistry,
+    n_results: int | None = None,
+) -> KnowledgeResult
+```
+
+- **STATUS:** `stable`
+- **OWNER:** `abm.memory.chroma_controller.ChromaController`
+- **DEPENDENCIES:** `ServiceRegistry.embedder`, `ServiceRegistry.controller`
+- **CONSUMERS:** console `search` command
+
+Direct semantic search across all four memory streams without classification
+routing. Returns hits sorted by distance. Degrades gracefully on embed failure.
+
+---
+
+#### `getSystemStatus(*, registry) → StatusResult`
+
+```python
+def getSystemStatus(*, registry: ServiceRegistry) -> StatusResult
+```
+
+- **STATUS:** `stable`
+- **OWNER:** `abm.strategic_wing.workflow_monitor.WorkflowMonitor`
+- **DEPENDENCIES:** `ServiceRegistry.monitor`, `ServiceRegistry.health_check()`
+- **CONSUMERS:** console `status` command
+
+Aggregates `WorkflowMonitor.get_overview_report()`, `scan_quarantine_directory()`,
+and `ServiceRegistry.health_check()`. Read-only. Never raises.
+
+---
+
+#### `summarizeProject(project_name, *, registry, n_results_per_stream=3) → StrategicAnalysisResult`
+
+```python
+def summarizeProject(
+    project_name: str,
+    *,
+    registry: ServiceRegistry,
+    n_results_per_stream: int = 3,
+) -> StrategicAnalysisResult
+```
+
+- **STATUS:** `stable`
+- **OWNER:** `abm.strategic_wing.strategic_asset_analyzer.StrategicAssetAnalyzer`
+- **DEPENDENCIES:** `ServiceRegistry.analyzer` (→ embedder + controller)
+- **CONSUMERS:** console `summarize` command
+
+Thin delegation to `StrategicAssetAnalyzer.analyze()`. Returns a
+`StrategicAnalysisResult` with `decision_recorded=False` always.
+**Raises** `ValueError` for empty project_name; `RuntimeError` if Ollama
+is unreachable (propagated from analyzer).
+
+---
+
+#### `aggregateProjectMemory(project_name, *, registry, n_results=None) → MemoryResult`
+
+```python
+def aggregateProjectMemory(
+    project_name: str,
+    *,
+    registry: ServiceRegistry,
+    n_results: int | None = None,
+) -> MemoryResult
+```
+
+- **STATUS:** `stable`
+- **OWNER:** `abm.memory.chroma_controller.ChromaController`
+- **DEPENDENCIES:** `ServiceRegistry.embedder`, `ServiceRegistry.controller`
+- **CONSUMERS:** console `memory` command
+
+Embeds the project name, queries all four streams independently, returns
+results grouped by collection name. A composed retrieval view — no new engine.
+Degrades gracefully on embed failure.
+
+---
+
+#### `explainAuditRecord(target, *, registry) → ExplainResult`
+
+```python
+def explainAuditRecord(
+    target: str,
+    *,
+    registry: ServiceRegistry,
+) -> ExplainResult
+```
+
+- **STATUS:** `stable`
+- **OWNER:** `abm.strategic_wing.workflow_monitor.WorkflowMonitor` (source A),
+  `abm.memory.chroma_controller.ChromaController` (source B — Stream D)
+- **DEPENDENCIES:** `ServiceRegistry.monitor`, `ServiceRegistry.embedder`,
+  `ServiceRegistry.controller`
+- **CONSUMERS:** console `explain` command
+
+Two audit sources consulted (constitution rule 5 — every action is auditable):
+
+**Source A — WorkflowMonitor (in-memory, live-session scope):**
+Looks up `target` as a contract_id substring. Each found `TaskRecord` exposes:
+routing department, confidence_hint, task state, v0.4 gate scores
+(confidence_score, quarantine_flag), and execution result.
+
+**Source B — ChromaDB Stream D (persisted, cross-session):**
+Embeds `target` and queries `abm_cognitive_identity` for
+`STRATEGIC DECISION RECORD` entries written by `DecisionJournal.log_decision()`.
+
+Both sources are searched and combined in the result. Never raises.
+
+---
+
+### ── FUTURE Capabilities (stubs) ─────────────────────────────────────────────
+
+Each raises `NotImplementedError`. A console command may only be added the day
+its backend phase is fully gated. See `ARCHITECTURE_BACKLOG.md` and
+`CLIENT_01_CONSOLE.md`.
+
+| Function | STATUS | Why deferred |
+|----------|--------|--------------|
+| `continueTask(task_id, *, registry)` | `future` | Requires session-state / task-continuation engine — not designed anywhere in roadmap |
+| `reflectOnWork(*, registry)` | `future` | Requires reflection engine — does not exist in any `ABM_SPEC.md` phase |
+| `planProject(project, *, registry)` | `future` | Requires planning agent — does not exist |
+| `learnTopic(topic, *, registry)` | `future` | Requires autonomous research-task queue — does not exist |
+
+---
+
+## Module: `abm.api` (package)
+
+**File:** [`abm/api/__init__.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/api/__init__.py)
+
+```python
+from abm.api import (
+    # Core lifecycle
+    APIConfig, ServiceRegistry, HealthStatus,
+    # Return types
+    AnswerResult, KnowledgeResult, StatusResult, MemoryResult, ExplainResult,
+    # Stable capabilities
+    answerQuestion, retrieveKnowledge, getSystemStatus,
+    summarizeProject, aggregateProjectMemory, explainAuditRecord,
+    # Future stubs (NotImplementedError)
+    continueTask, reflectOnWork, planProject, learnTopic,
+)
+```
+
+All clients import from `abm.api` only — never from `abm.api.core` or
+`abm.api.capabilities` directly.
+
+---
+
+## Phase v1.0 — Console Client (#1)
+
+### Module: `abm.clients.console.commands`
+
+**File:** [`abm/clients/console/commands.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/clients/console/commands.py)
+
+Six command handlers. Each accepts plain Python scalars + `registry` keyword
+arg, calls one API capability, passes the result to a formatter.
+
+```python
+def cmd_ask(question: str, *, registry: ServiceRegistry) -> str
+def cmd_search(query: str, *, registry: ServiceRegistry) -> str
+def cmd_status(*, registry: ServiceRegistry) -> str
+def cmd_summarize(project: str, *, registry: ServiceRegistry) -> str
+def cmd_memory(project: str, *, registry: ServiceRegistry) -> str
+def cmd_explain(target: str, *, registry: ServiceRegistry) -> str
+```
+
+**Invariants:**
+- No `cmd_*` function imports from `abm.memory`, `abm.orchestrator`,
+  `abm.companion`, `abm.sandbox`, or `abm.strategic_wing` directly.
+- `cmd_continue`, `cmd_reflect`, `cmd_plan`, `cmd_learn` do NOT exist —
+  no backend engine is built for them.
+
+---
+
+### Module: `abm.clients.console.formatter`
+
+**File:** [`abm/clients/console/formatter.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/clients/console/formatter.py)
+
+```python
+def format_ask(result: AnswerResult) -> str
+def format_search(result: KnowledgeResult) -> str
+def format_status(result: StatusResult) -> str
+def format_summarize(result: StrategicAnalysisResult) -> str
+def format_memory(result: MemoryResult) -> str
+def format_explain(result: ExplainResult) -> str
+```
+
+Zero cognitive logic. Converts API result types to terminal output with
+relevance bars, stream labels, snippet truncation, and degraded warnings.
+
+---
+
+### Module: `abm.clients.console.main`
+
+**File:** [`abm/clients/console/main.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/clients/console/main.py)
+
+CLI entry point. Usage:
+
+```bash
+python -m abm.clients.console.main ask "what is ABM?"
+python -m abm.clients.console.main search "BLoC pattern"
+python -m abm.clients.console.main status
+python -m abm.clients.console.main summarize smart_transit
+python -m abm.clients.console.main memory houseconnect
+python -m abm.clients.console.main explain TXN_12345
+python -m abm.clients.console.main --verbose ask "..."
+python -m abm.clients.console.main --chroma-dir /path/to/db status
+```
+
+Boot sequence: parse args → `APIConfig()` → `ServiceRegistry.boot()` →
+dispatch to `cmd_*` → print → `ServiceRegistry.shutdown()`.
+
+Exits `0` on success, `1` on error, `130` on `KeyboardInterrupt`.
+
+---
+
+## Phase v1.0 Test Gate
+
+**File:** [`tests/test_phase_v10_gate.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_phase_v10_gate.py)
+
+**Gate run command:**
+```bash
+python -m pytest tests/test_phase_v10_gate.py -v
+```
+
+**Full regression:**
+```bash
+python -m pytest tests/ -v
+```
+
+### Hard gate proofs (49 tests — all mocked, no live Ollama required)
+
+| Class | Proves |
+|-------|--------|
+| `TestAPILayerStructureGate` | Six stable capabilities exist; four future stubs raise `NotImplementedError`; no module-leaking names; return types are typed dataclasses not raw ChromaDB types |
+| `TestCapabilityStatusTagsGate` | Every stable capability tagged `stable`; every future stub tagged `future`; all stable capabilities declare OWNER, DEPENDENCIES, CONSUMERS |
+| `TestServiceRegistryLifecycleGate` | Accessing services before boot raises; shutdown is idempotent; double boot is a warning not an error; health_check never raises; APIConfig defaults match v0.1–v0.5 constants |
+| `TestConsoleCommandsOnlyStableGate` | Exactly six `cmd_*` functions exist; four deferred commands absent; commands.py imports only through `abm.api`; all commands accept `registry` keyword |
+| `TestAPICapabilityContractGate` | Each capability delegates to correct backend; returns correct typed result; degrades gracefully (never raises) when Ollama is unavailable |
+| `TestPriorPhaseRegressionGate` | v0.1–v0.5 collection names, department enum values, task state values, validation formula weights, and API config Ollama URL are all unchanged |
+
+*Updated for ABM 2.0 Phase v1.0. Update this file whenever new capabilities or schemas are added.*

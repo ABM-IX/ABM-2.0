@@ -1,8 +1,29 @@
 # ABM 2.0 — Project Brief (read this before ABM_SPEC.md)
 
+## Document authority (read this first — prevents contradicting sources of truth)
+
+| Document | Purpose | Authority |
+|---|---|---|
+| `ABM_SPEC.md` | System architecture | Highest authority for architecture |
+| `ARCHITECTURAL_CONSTITUTION.md` | Immutable rules | Highest authority for governance |
+| `MISSION_VISION_PHILOSOPHY.md` | Why ABM exists | Highest authority for judgment calls no rule covers |
+| `MEMORY_LIFECYCLE_POLICY.md` | Retention/compression/archival per stream | Authority for memory lifecycle |
+| `PROJECT_BRIEF.md` (this file) | Current phase scope and status | Authority for what's in scope right now |
+| `CLIENT_01_CONSOLE.md` | Client #1 (console) contract | Authority for console scope only |
+| `interfaces.md` | Public API/function contracts | Authority for exact signatures |
+| `ARCHITECTURE_BACKLOG.md` | Future candidates | Non-authoritative — nothing here is committed |
+
+If two documents conflict, the higher-authority one wins, and the
+lower one should be corrected to match — flag it rather than silently
+picking one.
+
+
+
 **Status:** Phases v0.1 through v0.5 complete and gated — 456 tests passing,
-tagged `v0.1-memory-core` through `v0.5-strategic-wing`. Now starting Phase
-v1.0 ("Cognitive OS Release").
+tagged `v0.1-memory-core` through `v0.5-strategic-wing`. Client #1 (Console +
+API Layer) complete and gated — 505 tests passing, tagged `client01-console`.
+Phase v1.0 ("Cognitive OS Release": Flutter mobile app, foreground service,
+encrypted sync, ambient telemetry) has not yet started.
 
 **What this project is:** A local-first, privacy-isolated Cognitive OS acting as
 a digital twin of the developer (Araba/ABM) and administrative overseer for

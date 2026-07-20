@@ -16,6 +16,17 @@ Design contract:
   - A debounce window collapses rapid save storms into one event per file.
   - The watcher runs in a background daemon thread — it never blocks the
     calling thread.
+
+Exclusion contract (added post-v0.2 gate):
+  - EXCLUDED_DIRS  — directory-name segments that are always ignored when
+    they appear anywhere in a path (e.g. "__pycache__", ".git").
+  - EXCLUDED_EXTENSIONS — file suffixes (lower-case, with leading dot) that
+    are always ignored (e.g. ".pyc", ".pyo").
+  - Exclusion is applied at the earliest possible point — inside
+    _DebounceHandler._schedule() — so excluded paths NEVER enter the debounce
+    queue, NEVER trigger callbacks, and are NEVER ingested into any stream.
+  - _is_excluded(path) is the single authoritative gate; all callers must use
+    it rather than re-implementing the check inline.
 """
 
 from __future__ import annotations
@@ -48,6 +59,64 @@ DEVICE_SOURCE: str = "dynamic_mobile_node"
 
 #: Default debounce window in seconds.
 DEFAULT_DEBOUNCE_SECONDS: float = 1.0
+
+# ---------------------------------------------------------------------------
+# Exclusion lists — paths matching any entry here are NEVER ingested.
+# ---------------------------------------------------------------------------
+
+#: Directory name segments that disqualify a path from ingestion.
+#: Matched against every component in the path, so a segment anywhere in the
+#: tree (e.g. deep/__pycache__/foo.pyc) is correctly excluded.
+EXCLUDED_DIRS: frozenset[str] = frozenset(
+    {
+        "__pycache__",   # Python bytecode cache directories
+        ".git",          # Git internal objects/refs (never source)
+        ".hg",           # Mercurial equivalent
+        ".svn",          # Subversion metadata
+        ".tox",          # tox virtualenv artefacts
+        ".venv",         # common virtual-environment name
+        "venv",          # alternate virtual-environment name
+        ".env",          # dotenv-style venv
+        "env",           # bare venv name
+        "node_modules",  # JavaScript package tree
+        ".pytest_cache", # pytest internal cache
+        ".mypy_cache",   # mypy type-check cache
+        ".ruff_cache",   # ruff linter cache
+        "dist",          # Python/JS build output
+        "build",         # generic build output
+        ".eggs",         # setuptools egg directory
+        "__pypackages__",# PEP 582 local packages
+        ".DS_Store",     # macOS Finder metadata (dir variant)
+        "Thumbs.db",     # Windows thumbnail cache (dir variant)
+    }
+)
+
+#: File-extension suffixes (lower-case, with leading dot) to exclude.
+#: Matched against the file's suffix after lower-casing.
+EXCLUDED_EXTENSIONS: frozenset[str] = frozenset(
+    {
+        ".pyc",    # compiled Python bytecode
+        ".pyo",    # optimised Python bytecode (Python ≤3.4)
+        ".pyd",    # Windows Python extension module (compiled)
+        ".pyi",    # type-stub files (not runnable source)
+        ".egg",    # Python egg archive
+        ".whl",    # Python wheel archive
+        ".so",     # compiled shared object
+        ".dll",    # Windows DLL
+        ".exe",    # Windows executable
+        ".o",      # C/C++ object file
+        ".class",  # JVM bytecode
+        ".log",    # log files (generated output)
+        ".lock",   # lock files (e.g. poetry.lock artefacts) — *content* only;
+                   # the file itself is metadata, not source
+        ".DS_Store",   # macOS Finder metadata
+        ".swp",    # Vim swap file
+        ".swo",    # Vim swap file (alternate)
+        ".tmp",    # generic temporary file
+        ".bak",    # editor backup file
+        ".orig",   # merge conflict original
+    }
+)
 
 
 # ---------------------------------------------------------------------------
@@ -101,6 +170,44 @@ class FileChangeEvent:
 # ---------------------------------------------------------------------------
 
 
+def _is_excluded(path: str) -> bool:
+    """
+    Return ``True`` if ``path`` must be silently ignored.
+
+    Exclusion is triggered when **any** of the following is true:
+
+    1. The file's suffix (lower-cased) is in ``EXCLUDED_EXTENSIONS``.
+    2. Any component of the resolved path matches a name in ``EXCLUDED_DIRS``.
+
+    This is the single authoritative exclusion gate. All call-sites must use
+    this function instead of re-implementing the logic inline.
+
+    Parameters
+    ----------
+    path : str
+        Absolute (or relative) file path to test.
+
+    Returns
+    -------
+    bool
+        ``True``  → drop this event, never pass to debounce or callbacks.
+        ``False`` → event may proceed normally.
+    """
+    p = Path(path)
+
+    # 1. Extension check (fast — O(1) frozenset lookup).
+    if p.suffix.lower() in EXCLUDED_EXTENSIONS:
+        return True
+
+    # 2. Directory-segment check — walk every component of the path.
+    # Using Path.parts gives OS-normalised segments without re-splitting.
+    for part in p.parts:
+        if part in EXCLUDED_DIRS:
+            return True
+
+    return False
+
+
 def _infer_repository(file_path: str) -> str:
     """
     Walk up the directory tree from ``file_path`` to find a ``.git`` directory.
@@ -126,6 +233,10 @@ class _DebounceHandler(FileSystemEventHandler):
 
     When a file changes multiple times within ``debounce_seconds``, only the
     last event in the window is forwarded to the callbacks.
+
+    Paths that match ``_is_excluded()`` are dropped unconditionally inside
+    ``_schedule()`` before entering the pending queue, so they can never
+    reach a callback or be ingested into any stream.
     """
 
     def __init__(
@@ -163,7 +274,15 @@ class _DebounceHandler(FileSystemEventHandler):
     # ------------------------------------------------------------------
 
     def _schedule(self, path: str, event_type: str) -> None:
-        """Queue an event for ``path`` and reset its debounce timer."""
+        """Queue an event for ``path`` and reset its debounce timer.
+
+        Paths that match the exclusion list are silently dropped here — they
+        never enter ``_pending``, never trigger the debounce timer, and never
+        reach a callback or stream.
+        """
+        if _is_excluded(path):
+            logger.debug("FileWatcher excluded (not ingested): %s", path)
+            return
         fire_at = time.monotonic() + self._debounce_seconds
         with self._lock:
             self._pending[path] = (event_type, fire_at)

@@ -8,3 +8,5 @@ No cloud LLM APIs are used anywhere in this system.
 
 __version__ = "0.1.0"
 __phase__ = "v0.1 — Memory Brain Core"
+
+# test

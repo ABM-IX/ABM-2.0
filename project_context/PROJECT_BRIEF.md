@@ -17,84 +17,92 @@ If two documents conflict, the higher-authority one wins, and the
 lower one should be corrected to match — flag it rather than silently
 picking one.
 
-
-
-**Status:** Phases v0.1 through v0.5 complete and gated — 456 tests passing,
-tagged `v0.1-memory-core` through `v0.5-strategic-wing`. Client #1 (Console +
-API Layer) complete and gated — 505 tests passing, tagged `client01-console`.
-Phase v1.0 ("Cognitive OS Release": Flutter mobile app, foreground service,
-encrypted sync, ambient telemetry) has not yet started.
+**Status:** Phases v0.1 through v1.0 complete and gated (original roadmap
+finished), plus Client #1 (API layer + console) and a post-roadmap
+"Conversational & Task Execution Layer" (synthesis-grounded `ask`, the
+`run <task>` command, a dedicated `conversational` department). Phone ↔
+desktop encrypted sync verified working end-to-end with real data. Now
+starting **Phase v2.0, Increment 1: Service Interfaces** (see below) —
+the first, narrowly-scoped slice of the "System Kernel & Governance"
+backlog item, not the whole backlog at once.
 
 **What this project is:** A local-first, privacy-isolated Cognitive OS acting as
-a digital twin of the developer (Araba/ABM) and administrative overseer for
+a digital twin of the developer (Arabang/ABM) and administrative overseer for
 First Minds Proprietary Limited. Full detail in `ABM_SPEC.md`.
 
 **Ground rules for any agent working in this repo:**
-1. Read this file and `ABM_SPEC.md` in full before writing any code.
-2. We are strictly scoped to **Phase v1.0** right now (see ABM_SPEC.md section 10
-   and the hardware-agnostic blueprint corrections). This is the final phase
-   on the roadmap — there is no v1.1 to defer to, so scope creep here means
-   scope creep into an unbounded "everything" phase. Build ON TOP of the
-   existing v0.1–v0.5 modules — do not modify their collections, schemas,
-   chunking, watcher, ingestion, routing, sandbox, or strategic-wing logic.
-6. **Framework:** the mobile node is built in **Flutter/Dart**, not native
-   Kotlin — this matches the `framework: "flutter"` / `state_pattern: "bloc"`
-   literals already fixed in Stream A's schema since v0.1. Use the BLoC
-   pattern for the app's own state management, for the same consistency
-   reason.
-7. **Crypto rule:** the encrypted cross-node sync channel must use a vetted
-   Dart crypto package (e.g. the `cryptography` package for AES-GCM, with
-   `flutter_secure_storage` for key storage — which itself wraps Android
-   Keystore / iOS Keychain) — never a hand-rolled cipher or custom
-   key-exchange scheme.
-8. **Telemetry scope for this phase:** ambient interaction managers ingest
-   Git trees, IDE workspace state, and static design docs only — matching
-   the v0.1 rollout guardrail. Clipboard tracking, voice logs, and browser
-   tracking stay OFFLINE until explicitly re-scoped by ABM in a future brief.
-3. **Local-first only.** No cloud LLM APIs (no OpenAI, Gemini, Groq, Cohere,
-   OpenRouter, ElevenLabs, etc.). All inference and embeddings route through a
-   local Ollama instance at `127.0.0.1:11434`, per spec section 4.
-4. Use the **exact** metadata schemas and collection names given in spec
-   section 3 — do not rename fields or restructure them.
+1. Read this file, `ABM_SPEC.md`, and `ARCHITECTURAL_CONSTITUTION.md` in full
+   before writing any code.
+2. We are strictly scoped to **Phase v2.0, Increment 1** right now (see
+   below). Do NOT build Event Bus, Plugin Architecture, Capability Registry,
+   or any other item from `ARCHITECTURE_BACKLOG.md` — those remain
+   deliberately deferred until this narrower increment lands and a real need
+   for the next one is demonstrated, not assumed. Build ON TOP of the
+   existing `ServiceRegistry` (`abm/api/core/registry.py`) — do not replace
+   its boot/shutdown lifecycle, which already works correctly.
+3. **Local-first only.** No cloud LLM APIs. All inference and embeddings
+   route through a local Ollama instance at `127.0.0.1:11434`.
+4. Use the **exact** metadata schemas and collection names already
+   established — do not rename fields or restructure them.
 5. Before finishing your task, write or update `interfaces.md` in the repo
    root documenting every function signature, file path, and metadata shape
-   you created, so other tools building on your work don't have to guess.
+   you created or changed.
+6. **Framework:** the mobile node is Flutter/Dart, BLoC pattern.
+7. **Crypto rule:** vetted libraries only (Dart `cryptography` package,
+   `flutter_secure_storage`) — never hand-rolled cryptography.
+8. **Telemetry scope:** ambient interaction managers ingest Git trees, IDE
+   workspace state, and static design docs only. Clipboard, voice, and
+   browser tracking stay OFFLINE until explicitly re-scoped.
 
-**Phase v0.1 (complete):**
-- ChromaDB initialized with 4 isolated collections: `abm_cognitive_identity`,
-  `abm_code_topologies`, `abm_technical_mastery`, `abm_ambient_telemetry`.
-- A local embedding connector using `nomic-embed-text` via Ollama.
-- Mock-assertion tests proving zero data crossover between collections.
+**Phase v0.1 (complete):** ChromaDB with 4 isolated collections, local
+embedding via `nomic-embed-text`, isolation tests.
 
-**Phase v0.2 (complete):**
-- IDE file-watcher hooks routing changes into v0.1 ingestion.
-- Local Git integration pipeline (commits, diffs, branch state).
-- Code structure analyzer extending the v0.1 AST chunker.
-- Style fingerprint extraction engine writing schema-valid Stream A entries.
+**Phase v0.2 (complete):** File-watcher hooks, Git integration pipeline,
+code structure analyzer, style fingerprint extraction.
 
-**Phase v0.3 (complete):**
-- Non-generating classification router (routes only, never generates content).
-- Sub-agent department worker sandboxes scoped per department.
-- JSON task delegation / result-reporting contracts.
+**Phase v0.3 (complete):** Non-generating classification router, department
+worker sandboxes, JSON task delegation contracts.
 
-**Phase v0.5 (complete):**
-- Decision journal writing strategic decisions into Stream D's existing schema.
-- Read-only workflow monitor aggregating orchestrator/sandbox task state.
-- Strategic asset analyzer — analysis only, never writes decisions itself.
+**Phase v0.4 (complete):** Background Docker container init/teardown per
+delegated task, compiler/test-check loop, multi-factor validation gate
+(C formula + S_val/Test_succ floor gates) with quarantine routing.
 
-**Phase v1.0 deliverables (from spec section 10, item 6, and the
-hardware-agnostic blueprint corrections in section 2 — now built in
-Flutter/Dart per ground rule 6):**
-- Flutter-based Android Foreground Service (via a maintained plugin such as
-  `flutter_foreground_task`, not raw platform channels reinventing the
-  wheel): modular, device-agnostic, using a persistent notification to
-  prevent the OS low-memory killer from stripping its execution thread.
-  BLoC pattern for state management.
-- Encrypted cross-node synchronization channel between this desktop repo
-  and the Flutter mobile node, connecting to the existing v0.1–v0.5 memory
-  core. Must use a vetted Dart crypto package — see ground rule 7.
-- Ambient interaction managers feeding Stream C (`abm_ambient_telemetry`)
-  using its existing `dynamic_mobile_node` device_source schema — scope
-  limited per ground rule 8.
-- This is the final phase on the current roadmap. Its test gate is the
-  project's completion gate.
+**Phase v0.5 (complete):** Decision journal into Stream D, read-only
+workflow monitor, strategic asset analyzer (analysis only).
+
+**Phase v1.0 (complete):** Flutter Foreground Service, encrypted cross-node
+sync channel (AES-256-GCM, manually-paired keys), ambient interaction
+manager with retention housekeeping. Verified end-to-end with real
+phone-originated telemetry correctly encrypted, decrypted, and attributed.
+
+**Client #1 (complete):** API layer (capability-oriented, not module-oriented
+function names, per constitution rule 14) + CLI console with `ask`,
+`search`, `status`, `summarize`, `memory`, `explain`.
+
+**Conversational & Task Execution Layer (complete, post-roadmap addition):**
+Synthesis-grounded natural-language answers (with strict anti-hallucination
+handling for identity/factual questions — extractive, not generative, for
+"what is ABM"-type questions), a `conversational` department for small talk
+scoped to Streams C+D, and a `run <task>` command dispatching real work
+through the v0.3 classifier + v0.4 sandbox + confidence gate.
+
+**Phase v2.0, Increment 1 deliverables — Service Interfaces:**
+- `ServiceRegistry` (`abm/api/core/registry.py`) already handles boot/
+  shutdown lifecycle and centralizes service access correctly — do not
+  rebuild this, it works. What's missing: its properties are typed to
+  CONCRETE classes (`ChromaController`, `OllamaEmbeddingWrapper`,
+  `OllamaModelGateway`), not abstract interfaces — so swapping an
+  implementation (e.g. ChromaDB for another vector store, or Ollama for
+  another local model runner) would require touching every consumer.
+- Define abstract interfaces (e.g. `VectorStoreInterface`,
+  `EmbedderInterface`, `ModelGatewayInterface`) that the existing concrete
+  classes implement. Type `ServiceRegistry`'s properties against these
+  interfaces, not the concrete classes.
+- This is a structural refactor only — no behavior changes. Every existing
+  test must continue to pass unchanged; if a test currently imports a
+  concrete class directly where it should use the interface, update the
+  test's import, not its assertions.
+- Increment 1 does not advance to Increment 2 (which item from
+  `ARCHITECTURE_BACKLOG.md` comes next, if any, is a future decision — not
+  assumed now) until this passes its own test gate at 100% with zero
+  regressions across the full existing suite.

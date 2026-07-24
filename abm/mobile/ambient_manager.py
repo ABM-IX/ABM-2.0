@@ -39,9 +39,11 @@ from abm.companion.file_watcher import (
     WorkspaceFileWatcher,
     _is_excluded,
 )
-from abm.companion.git_pipeline import GitPipeline, GitPipelineError
-from abm.memory.chroma_controller import ChromaController
-from abm.memory.embedding_wrapper import OllamaEmbeddingWrapper
+from typing import TYPE_CHECKING
+if TYPE_CHECKING:
+    from abm.companion.git_pipeline import GitPipeline
+
+from abm.api.core.interfaces import EmbedderInterface, VectorStoreInterface
 
 from .event_models import AmbientEvent
 from .retention_housekeeper import StreamCRetentionHousekeeper
@@ -99,6 +101,7 @@ class GitTreeMonitor:
         Returns the number of new commits emitted.  Never raises.
         """
         try:
+            from abm.companion.git_pipeline import GitPipelineError
             commits = self._pipeline.list_commits(max_count=20)
         except GitPipelineError as exc:
             logger.warning("GitTreeMonitor: poll failed: %s", exc)
@@ -392,8 +395,8 @@ class AmbientInteractionManager:
 
     def __init__(
         self,
-        controller: ChromaController,
-        embedder: OllamaEmbeddingWrapper,
+        controller: VectorStoreInterface,
+        embedder: EmbedderInterface,
         config: ManagerConfig | None = None,
     ) -> None:
         self._controller = controller
@@ -516,14 +519,18 @@ class AmbientInteractionManager:
         if not self._config.git_repo_path:
             return None
         try:
+            from abm.companion.git_pipeline import GitPipeline, GitPipelineError
             pipeline = GitPipeline(self._config.git_repo_path)
             return GitTreeMonitor(git_pipeline=pipeline, on_event=self._handle_event)
 
-        except GitPipelineError as exc:
-            logger.warning(
-                "AmbientInteractionManager: Git monitor disabled (%s).", exc
-            )
-            return None
+        except Exception as exc:
+            from abm.companion.git_pipeline import GitPipelineError
+            if isinstance(exc, GitPipelineError):
+                logger.warning(
+                    "AmbientInteractionManager: Git monitor disabled (%s).", exc
+                )
+                return None
+            raise
 
 
 __all__ = [

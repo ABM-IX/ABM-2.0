@@ -43,6 +43,7 @@ PERMITTED_SOURCE_KINDS: frozenset[str] = frozenset(
         "git_commit",     # A commit event from GitTreeMonitor
         "workspace_file", # A non-code file change from WorkspaceStateMonitor
         "design_doc",     # A design/spec doc discovered by DesignDocMonitor
+        "chat_history",   # A captured chat interaction history
     }
 )
 
@@ -92,13 +93,10 @@ class AmbientEvent:
     source_path: str
     text: str
     epoch_timestamp: int = field(default_factory=lambda: int(time.time()))
-    device_source: str = field(init=False)
+    device_source: str = "desktop_workspace"
     extra: dict = field(default_factory=dict)
 
     def __post_init__(self) -> None:
-        # Enforce device_source regardless of what the caller passed
-        self.device_source = "dynamic_mobile_node"
-
         # Validate source_kind at construction time so callers get a clear error
         if self.source_kind not in PERMITTED_SOURCE_KINDS:
             raise ValueError(

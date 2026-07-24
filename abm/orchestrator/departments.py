@@ -88,6 +88,7 @@ class Department(str, Enum):
     ARCHITECTURE         = "architecture"
     SECURITY             = "security"
     MEMORY_INDEXING      = "memory_indexing"
+    CONVERSATIONAL       = "conversational"
 
 
 # ---------------------------------------------------------------------------
@@ -350,6 +351,28 @@ DEPARTMENT_REGISTRY: dict[Department, DepartmentWorkerSandbox] = {
         description=(
             "Handles memory ingestion, re-indexing, and reflection loop "
             "operations. Scoped to all four Streams. Observe-only autonomy."
+        ),
+    ),
+    Department.CONVERSATIONAL: _sandbox(
+        department=Department.CONVERSATIONAL,
+        streams=frozenset(
+            {
+                COLLECTION_COGNITIVE_IDENTITY,
+                COLLECTION_AMBIENT_TELEMETRY,
+            }
+        ),
+        tools=frozenset(
+            {
+                TOOL_CHROMA_QUERY,
+                TOOL_MODEL_GATEWAY,
+            }
+        ),
+        autonomy_level=0,
+        agents=("conversational_node",),
+        success_conditions=("user_intent_addressed == true",),
+        description=(
+            "Handles general inquiries, greetings, and small talk. Scoped to "
+            "Stream D (Identity) and Stream C (Recent Telemetry/History)."
         ),
     ),
 }

@@ -588,7 +588,7 @@ class TestDepartmentEnum(unittest.TestCase):
         self.assertEqual(Department.MEMORY_INDEXING.value, "memory_indexing")
 
     def test_exactly_five_departments(self):
-        self.assertEqual(len(Department), 5)
+        self.assertEqual(len(Department), 6)
 
     def test_department_is_str_subclass(self):
         """Department members can be used directly as JSON-serialisable strings."""
@@ -604,7 +604,7 @@ class TestDepartmentRegistry(unittest.TestCase):
     """DEPARTMENT_REGISTRY contains exactly five entries with valid configs."""
 
     def test_registry_has_five_entries(self):
-        self.assertEqual(len(DEPARTMENT_REGISTRY), 5)
+        self.assertEqual(len(DEPARTMENT_REGISTRY), 6)
 
     def test_all_departments_in_registry(self):
         for dept in Department:

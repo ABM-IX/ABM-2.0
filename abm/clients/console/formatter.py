@@ -22,6 +22,7 @@ from abm.api.capabilities import (
     KnowledgeResult,
     MemoryResult,
     StatusResult,
+    RunTaskResult,
 )
 from abm.memory.chroma_controller import (
     COLLECTION_AMBIENT_TELEMETRY,
@@ -114,12 +115,25 @@ def format_ask(result: AnswerResult) -> str:
     if result.degraded:
         lines.append(_degraded_warning("ask"))
 
-    if not result.hits:
-        lines.append("\n  No relevant memory found for this question.\n")
+    if not result.hits and not result.synthesis:
+        lines.append("\n  I cannot answer this question because no relevant memory was found in the allowed streams.\n")
     else:
-        lines.append(f"\n  {len(result.hits)} memory hit(s):\n")
-        for i, hit in enumerate(result.hits):
-            lines.append(_format_hit(hit, i))
+        if result.synthesis:
+            lines.append("\n  Synthesis:")
+            for tl in result.synthesis.splitlines():
+                lines.append(f"    {tl}")
+            if result.hits and result.department != "conversational":
+                lines.append("\n  --- Sources ---\n")
+        else:
+            lines.append("")
+
+        if result.hits:
+            if result.department != "conversational":
+                lines.append(f"  {len(result.hits)} memory hit(s):\n")
+                for i, hit in enumerate(result.hits):
+                    lines.append(_format_hit(hit, i))
+                    lines.append("")
+        else:
             lines.append("")
 
     lines.append(_DIVIDER)
@@ -271,6 +285,9 @@ def format_explain(result: ExplainResult) -> str:
                 passed_icon = "✓ PASSED" if rec["gate_passed"] else "✗ FAILED"
                 lines.append(f"    Gate        : {passed_icon}")
                 lines.append(f"    Confidence  : {rec.get('confidence_score', '?')}")
+                if "validation_scores" in rec:
+                    vs = rec["validation_scores"]
+                    lines.append(f"    Scores      : M_align={vs['m_align']} | T_correct={vs['t_correct']} | S_val={vs['s_val']} | Test_succ={vs['test_succ']} | P_align={vs['p_align']}")
                 lines.append(f"    Quarantined : {rec.get('quarantine_flag', False)}")
                 if rec.get("gate_reason"):
                     lines.append(f"    Gate reason : {rec['gate_reason']}")
@@ -292,3 +309,24 @@ def format_explain(result: ExplainResult) -> str:
 
     lines.append(_DIVIDER)
     return "\n".join(lines)
+
+
+def format_run(result: RunTaskResult) -> str:
+    """Format the output of ``runTask`` for terminal display."""
+    lines = [
+        _DIVIDER,
+        "  ABM › run",
+        _DIVIDER,
+    ]
+
+    if result.degraded:
+        lines.append(_degraded_warning("run"))
+        lines.append("  Task dispatch failed due to unavailable classification service.")
+    else:
+        lines.append(f"\n  Task Dispatched: {result.task_id}")
+        lines.append("  Worker execution has started in the background.")
+        lines.append("  Use `abm status` or `abm explain <task_id>` to check progress.\n")
+
+    lines.append(_DIVIDER)
+    return "\n".join(lines)
+

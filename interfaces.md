@@ -45,7 +45,8 @@
     - [Module: `abm.strategic_wing.workflow_monitor`](#module-abmstrategic_wing-workflow_monitor)
     - [Module: `abm.strategic_wing.strategic_asset_analyzer`](#module-abmstrategic_wing-strategic_asset_analyzer)
     - [Module: `abm.strategic_wing` (package)](#module-abmstrategic_wing-package)
-14. [Test Suite](#test-suite)
+14. [Module: `abm.api.core.interfaces`](#module-abmapicoreinterfaces)
+15. [Test Suite](#test-suite)
 
 ---
 
@@ -55,6 +56,12 @@
 ABM-2.0/
 ├── abm/
 │   ├── __init__.py                    # Package root — version and phase metadata
+│   ├── launcher.py                    # Unified entry point for background threads
+│   ├── api/                           # API Layer
+│   │   └── core/
+│   │       ├── config.py
+│   │       ├── interfaces.py          # Abstract interfaces for swappable services
+│   │       └── registry.py            # ServiceRegistry container
 │   ├── memory/                        # v0.1 — sealed, do not modify
 │   │   ├── __init__.py                # Re-exports all v0.1 public symbols
 │   │   ├── chroma_controller.py       # ChromaDB collection manager
@@ -87,6 +94,7 @@ ABM-2.0/
 │       └── workflow_monitor.py        # In-flight task state aggregation
 ├── tests/
 │   ├── __init__.py
+│   ├── test_launcher.py               # Start/stop component loop proofs
 │   ├── test_phase_v01_gate.py         # Hard gate: v0.1 isolation + chunking + embed
 │   ├── test_memory_isolation.py       # Mock-assertion isolation / embed contract tests
 │   ├── test_metadata_and_chunking.py  # Metadata + chunking contract tests
@@ -2859,6 +2867,31 @@ Re-exports `AmbientInteractionManager`, `ManagerConfig`, `GitTreeMonitor`,
 
 ---
 
+## Module: `abm.mobile.sync_server`
+
+**File:** [`abm/mobile/sync_server.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/mobile/sync_server.py)
+
+HTTP sync server for receiving ambient telemetry from the Flutter mobile node over the local network. Uses AES-256-GCM for payload decryption, matching the Dart-side implementation.
+
+- Runs on `0.0.0.0:8765` by default.
+- Reads `key_id` and `key` from `.sync_pairing.json`.
+- Implements `/api/sync/handshake` and `/api/sync/payload`.
+- Decrypted payloads route through `ServiceRegistry.ambient_manager.ingest_event`.
+
+---
+
+## Module: `abm.mobile.pair`
+
+**File:** [`abm/mobile/pair.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/mobile/pair.py)
+
+CLI for manual pairing of the mobile node with the desktop daemon.
+
+- Command: `python -m abm.mobile.pair --key <base64> --key-id <id>`
+- Validates a 32-byte AES-256 key.
+- Writes to `.sync_pairing.json` in the project root. This file is excluded via `.gitignore`.
+
+---
+
 ## Flutter Encrypted Cross-Node Sync Channel
 
 The Flutter mobile node encrypts sync payloads before sending them to the
@@ -3173,6 +3206,28 @@ class AmbientEventModel {
 
 JSON field names match the Python `AmbientEvent` dataclass exactly.
 
+### `CrossNodeSyncRepository` & `SyncSettingsService`
+
+**Files:** 
+- [`mobile/lib/features/sync/repository/cross_node_sync_repository.dart`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/mobile/lib/features/sync/repository/cross_node_sync_repository.dart)
+- [`mobile/lib/features/sync/settings/sync_settings_service.dart`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/mobile/lib/features/sync/settings/sync_settings_service.dart)
+
+```dart
+class SyncSettingsService {
+    Future<String> getBaseUrl() → "http://172.24.56.26:8765" by default
+    Future<void> setBaseUrl(String url)
+}
+
+class CrossNodeSyncRepository {
+    CrossNodeSyncRepository({required String baseUrl, required SyncCryptoChannel channel})
+    
+    Future<SyncSendResult> sendHandshake()
+    Future<SyncSendResult> sendEncryptedJson(Map<String, dynamic> json)
+}
+```
+
+Configurable sync URL persistence powered by `shared_preferences`. `CrossNodeSyncRepository` dynamically receives the configured base URL rather than relying on a hardcoded string.
+
 ### `TelemetryRepository`
 
 **File:** [`mobile/lib/features/telemetry/repository/telemetry_repository.dart`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/mobile/lib/features/telemetry/repository/telemetry_repository.dart)
@@ -3211,7 +3266,7 @@ python -m pytest tests/ -v
 
 | Class | Proves |
 |-------|--------|
-| `TestAmbientEventSchemaGate` | Only PERMITTED_SOURCE_KINDS accepted; clipboard/voice/browser/unknown raise ValueError; device_source always "dynamic_mobile_node"; empty text raises; epoch_timestamp defaults to positive int |
+| `TestAmbientEventSchemaGate` | Only PERMITTED_SOURCE_KINDS accepted; clipboard/voice/browser/unknown raise ValueError; device_source defaults to "desktop_workspace" but respects constructor arg; empty text raises; epoch_timestamp defaults to positive int |
 | `TestStreamCWriterRetentionAwareGate` | Unique event → ok; duplicate within compress window → compressed; same event beyond window → ok; metadata has exactly 3 fields; embedding failure → error; ChromaDB failure → error; housekeeper called after ok; not called after compressed |
 | `TestRetentionHousekeeperLifecycleGate` | run_if_due skips before interval; runs after interval; force_run deletes past 180d; force_run summarizes past 14d; lifecycle constants match MEMORY_LIFECYCLE_POLICY |
 | `TestAmbientInteractionManagerScopeGate` | Git monitor None without repo; poll_git returns 0 without monitor; poll_git rate-limited; ingest permitted kind → ok/compressed; prohibited kind blocked at AmbientEvent construction; is_running False before start; design doc extensions correct |
@@ -3246,3 +3301,150 @@ python -m pytest tests/ -v
 | `TestAmbientManagerSourceAllowlistGate` | Only `git_commit`, `workspace_file`, `design_doc`; code files ignored; clipboard/voice/browser absent in Python + Dart + manifest |
 | `TestStreamCCompressionWindowGate` | Duplicates within 3600 s → `compressed`; after window → stored again; housekeeper summarizes past 14 d and deletes past 180 d |
 | `TestRoadmapRegressionGate` | All prior gates (`v0.1`–`v0.5`, Client #1, mobile gate) subprocess-verified still 100% green |
+
+---
+
+## Phase v1.0 ABM Launcher
+
+**File:** [`abm/launcher.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/launcher.py)
+
+**Execution command:**
+```bash
+python -m abm.launcher
+```
+
+The unified background process entry point for ABM. It starts the following components in parallel threads inside a single process, avoiding orphaned processes and file lock contention:
+1. `WorkspaceFileWatcher` (via `abm.companion.watch_daemon.build_coordinator`) — watches paths defined in `.abm_watch_paths.json` or defaults to the repository root.
+2. `SyncServerHandler` (via `abm.mobile.sync_server`) — HTTP server for incoming ambient telemetry.
+3. Retention Housekeeper Loop — periodically triggers `StreamCRetentionHousekeeper.run_if_due()` to compress or archive ambient memory.
+
+4. Background Ollama subprocess (if `ollama serve` is not already running), including `phi3:mini` pre-warming.
+
+Gracefully handles `SIGINT` (Ctrl+C) and `SIGTERM` by signaling an internal threading event, shutting down the HTTP server, and executing a clean `ServiceRegistry.shutdown()`. Also cleanly terminates the Ollama subprocess if it was started by the launcher.
+
+---
+
+## Phase v1.0 — API Capabilities
+
+### Dataclass `AnswerResult`
+
+Return type for `answerQuestion`.
+
+```python
+@dataclass
+class AnswerResult:
+    question: str
+    department: str
+    confidence: str
+    hits: list[dict[str, Any]]
+    synthesis: str = ""
+    fallback_used: bool = False
+    degraded: bool = False
+```
+
+**Attributes:**
+- `synthesis` — Natural-language answer synthesized by the model gateway from the retrieved `hits`. Grounded strictly in the context chunks.
+
+---
+
+### `answerQuestion(question: str, *, registry: ServiceRegistry, n_results: int | None = None) -> AnswerResult`
+
+Routes a natural-language question. If the question is a basic conversational greeting or trivial identity question (e.g. "hello", "who are you"), it hits a fast-path that bypasses classification and memory retrieval, generating a warm synthesized response immediately. Otherwise, it routes through the classification engine and retrieves relevant memory from the department's allowed streams, returning a grounded synthesized answer.
+
+**STATUS:** stable
+**OWNER:** `abm.orchestrator.router.ClassificationRouter`
+**DEPENDENCIES:** `ServiceRegistry.router`, `ServiceRegistry.embedder`, `ServiceRegistry.controller`, `ServiceRegistry.gateway`
+**CONSUMERS:** console `ask` command
+
+**Returns:** `AnswerResult`
+
+---
+
+### Dataclass `RunTaskResult`
+
+Return type for `runTask`.
+
+```python
+@dataclass
+class RunTaskResult:
+    task_id: str = ""
+    degraded: bool = False
+```
+
+**Attributes:**
+- `task_id` — The unique contract ID assigned to the dispatched task.
+- `degraded` — True if Ollama was unreachable, meaning the task could not be classified.
+
+---
+
+### `runTask(objective: str, *, registry: ServiceRegistry) -> RunTaskResult`
+
+Classifies the task, dispatches it to a background worker for execution in the sandbox, and returns the task ID immediately.
+
+**STATUS:** stable
+**OWNER:** `abm.orchestrator.router.ClassificationRouter`
+**DEPENDENCIES:** `ServiceRegistry.router`, `ServiceRegistry.gateway`, `ServiceRegistry.monitor`
+**CONSUMERS:** console `run` command
+
+**Parameters:**
+- `objective` — The task description. Must be non-empty.
+- `registry` — Booted service registry.
+
+**Returns:** `RunTaskResult`
+
+
+## Phase v1.0  Encrypted Telemetry Sync
+
+### Module: `mobile/lib/features/sync/repository/cross_node_sync_repository.dart`
+
+Replaces the plaintext telemetry repository. All ambient telemetry now routes identically via `CrossNodeSyncRepository` and the encrypted `/api/sync/payload` endpoint, complying with Constitution Rule 7.
+
+---
+
+## Module: `abm.api.core.interfaces`
+
+File: [`abm/api/core/interfaces.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/api/core/interfaces.py)
+
+Defines abstract base classes for core system dependencies to enable swappable components via the `ServiceRegistry`.
+
+### Class: `VectorStoreInterface(abc.ABC)`
+
+Abstract interface for vector database operations. Implemented by `ChromaController`.
+
+#### Methods
+
+- **`get_collection(collection_name: str) -> Any`**
+  Return the handle for the given collection name.
+
+- **`add_document(collection_name: str, doc_id: str, text: str, metadata: dict[str, Any], embedding: list[float]) -> None`**
+  Add a single document with a pre-computed embedding to the collection.
+
+- **`query_collection(collection_name: str, query_embedding: list[float], n_results: int = 5) -> QueryResult`**
+  Perform a nearest-neighbour vector query against the collection.
+
+### Class: `EmbedderInterface(abc.ABC)`
+
+Abstract interface for text embedding generation. Implemented by `OllamaEmbeddingWrapper`.
+
+#### Methods
+
+- **`health_check() -> bool`**
+  Verify that the embedding provider is reachable.
+
+- **`embed(text: str) -> list[float]`**
+  Generate a single embedding vector for the given text.
+
+- **`embed_batch(texts: list[str]) -> list[list[float]]`**
+  Generate embedding vectors for a list of texts.
+
+### Class: `ModelGatewayInterface(abc.ABC)`
+
+Abstract interface for the text-generation model gateway. Implemented by `OllamaModelGateway`.
+
+#### Methods
+
+- **`generate(prompt: str) -> GenerationResponse`**
+  Send a prompt to the model and return the generated text.
+
+- **`is_available() -> bool`**
+  Check whether the model gateway is reachable and ready.

@@ -12,10 +12,13 @@ import 'features/foreground/bloc/foreground_bloc.dart';
 import 'features/foreground/service/abm_foreground_service.dart';
 import 'features/foreground/ui/foreground_status_widget.dart';
 import 'features/telemetry/bloc/telemetry_bloc.dart';
-import 'features/telemetry/repository/telemetry_repository.dart';
+import 'features/sync/repository/cross_node_sync_repository.dart';
+import 'features/sync/ui/sync_settings_screen.dart';
 
 class AbmMobileApp extends StatelessWidget {
-  const AbmMobileApp({super.key});
+  const AbmMobileApp({super.key, required this.syncRepository});
+
+  final CrossNodeSyncRepository syncRepository;
 
   @override
   Widget build(BuildContext context) {
@@ -26,7 +29,7 @@ class AbmMobileApp extends StatelessWidget {
         ),
         BlocProvider<TelemetryBloc>(
           create: (_) => TelemetryBloc(
-            repository: TelemetryRepository.defaultInstance(),
+            repository: syncRepository,
           ),
         ),
       ],
@@ -64,14 +67,40 @@ class _AbmHome extends StatelessWidget {
           ),
         ),
         centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.settings),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SyncSettingsScreen(),
+                ),
+              );
+            },
+          ),
+        ],
       ),
-      body: const SafeArea(
+      body: SafeArea(
         child: Padding(
-          padding: EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
-              ForegroundStatusWidget(),
+              const ForegroundStatusWidget(),
+              const SizedBox(height: 16),
+              ElevatedButton(
+                onPressed: () {
+                  context.read<TelemetryBloc>().add(
+                        ObserveWorkspaceFile(
+                          repository: 'test_repo',
+                          filePath: 'test/path.dart',
+                          epochTimestamp: DateTime.now().millisecondsSinceEpoch ~/ 1000,
+                        ),
+                      );
+                },
+                child: const Text('Sync Now (Test)'),
+              ),
             ],
           ),
         ),

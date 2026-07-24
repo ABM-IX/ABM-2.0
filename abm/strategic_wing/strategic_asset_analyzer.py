@@ -13,16 +13,15 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any
 
+from abm.api.core.interfaces import EmbedderInterface, VectorStoreInterface
 from abm.memory.chroma_controller import (
     ALL_COLLECTIONS,
     COLLECTION_AMBIENT_TELEMETRY,
     COLLECTION_CODE_TOPOLOGIES,
     COLLECTION_COGNITIVE_IDENTITY,
     COLLECTION_TECHNICAL_MASTERY,
-    ChromaController,
     QueryResult,
 )
-from abm.memory.embedding_wrapper import OllamaEmbeddingWrapper
 
 
 STREAM_LABELS: dict[str, str] = {
@@ -77,8 +76,8 @@ class StrategicAssetAnalyzer:
 
     def __init__(
         self,
-        controller: ChromaController,
-        embedder: OllamaEmbeddingWrapper,
+        controller: VectorStoreInterface,
+        embedder: EmbedderInterface,
         collections: tuple[str, ...] = ALL_COLLECTIONS,
     ) -> None:
         self.controller = controller

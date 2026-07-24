@@ -599,7 +599,7 @@ class TestV01V02V03V04RegressionGate(unittest.TestCase):
         self.assertIn(".py", CODE_EXTENSIONS)
 
     def test_departments_enum_unchanged(self):
-        self.assertEqual(len(Department), 5)
+        self.assertEqual(len(Department), 6)
 
     def test_stream_d_schema_unchanged(self):
         self.assertEqual(

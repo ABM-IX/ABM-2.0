@@ -71,7 +71,7 @@ class AbmTaskHandler extends TaskHandler {
   }
 
   @override
-  Future<void> onDestroy(DateTime timestamp) async {
+  Future<void> onDestroy(DateTime timestamp, bool isTimeout) async {
     FlutterForegroundTask.sendDataToMain({
       'type': 'service_stopped',
       'timestamp': timestamp.millisecondsSinceEpoch,
@@ -167,7 +167,7 @@ class AbmForegroundService {
         ],
         callback: _startCallbackRef,
       );
-      if (!result.isSuccess) {
+      if (result is ServiceRequestFailure) {
         throw ForegroundServiceStartException(
           'FlutterForegroundTask.startService failed: ${result.error}',
         );

@@ -12,13 +12,13 @@ import 'package:bloc/bloc.dart';
 import 'package:equatable/equatable.dart';
 
 import '../models/ambient_event_model.dart';
-import '../repository/telemetry_repository.dart';
+import '../../sync/repository/cross_node_sync_repository.dart';
 
 part 'telemetry_event.dart';
 part 'telemetry_state.dart';
 
 class TelemetryBloc extends Bloc<TelemetryEvent, TelemetryState> {
-  TelemetryBloc({required TelemetryRepository repository})
+  TelemetryBloc({required CrossNodeSyncRepository repository})
       : _repository = repository,
         super(const TelemetryIdle()) {
     on<ObserveWorkspaceFile>(_onWorkspaceFile);
@@ -26,7 +26,7 @@ class TelemetryBloc extends Bloc<TelemetryEvent, TelemetryState> {
     on<ObserveDesignDoc>(_onDesignDoc);
   }
 
-  final TelemetryRepository _repository;
+  final CrossNodeSyncRepository _repository;
 
   Future<void> _onWorkspaceFile(
     ObserveWorkspaceFile event,
@@ -41,10 +41,10 @@ class TelemetryBloc extends Bloc<TelemetryEvent, TelemetryState> {
           'workspace file change: ${event.filePath}\nrepo=${event.repository}',
       epochTimestamp: event.epochTimestamp,
     );
-    final result = await _repository.sendEvent(model);
+    final result = await _repository.sendEncryptedJson(model.toJson());
     if (result.success) {
       emit(TelemetrySent(
-        docId: result.docId ?? '',
+        docId: '',
         status: result.status ?? 'ok',
         sourceKind: 'workspace_file',
       ));
@@ -70,10 +70,10 @@ class TelemetryBloc extends Bloc<TelemetryEvent, TelemetryState> {
           'repo=${event.repository}',
       epochTimestamp: event.epochTimestamp,
     );
-    final result = await _repository.sendEvent(model);
+    final result = await _repository.sendEncryptedJson(model.toJson());
     if (result.success) {
       emit(TelemetrySent(
-        docId: result.docId ?? '',
+        docId: '',
         status: result.status ?? 'ok',
         sourceKind: 'git_commit',
       ));
@@ -97,10 +97,10 @@ class TelemetryBloc extends Bloc<TelemetryEvent, TelemetryState> {
       text: 'design doc: ${event.docPath}\n\n${event.docPreview}',
       epochTimestamp: event.epochTimestamp,
     );
-    final result = await _repository.sendEvent(model);
+    final result = await _repository.sendEncryptedJson(model.toJson());
     if (result.success) {
       emit(TelemetrySent(
-        docId: result.docId ?? '',
+        docId: '',
         status: result.status ?? 'ok',
         sourceKind: 'design_doc',
       ));
@@ -114,7 +114,6 @@ class TelemetryBloc extends Bloc<TelemetryEvent, TelemetryState> {
 
   @override
   Future<void> close() {
-    _repository.dispose();
     return super.close();
   }
 }

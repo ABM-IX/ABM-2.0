@@ -402,9 +402,9 @@ class TestAmbientManagerSourceAllowlistGate:
 
     PROHIBITED_KINDS = ["clipboard", "voice", "browser", "microphone", "camera"]
 
-    def test_permitted_source_kinds_exactly_three(self):
+    def test_permitted_source_kinds_exactly_four(self):
         assert PERMITTED_SOURCE_KINDS == frozenset(
-            {"git_commit", "workspace_file", "design_doc"}
+            {"git_commit", "workspace_file", "design_doc", "chat_history"}
         )
 
     @pytest.mark.parametrize("bad_kind", PROHIBITED_KINDS)

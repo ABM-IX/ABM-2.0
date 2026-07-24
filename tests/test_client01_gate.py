@@ -182,7 +182,7 @@ class TestAPILayerStructureGate(unittest.TestCase):
     def test_answer_result_fields(self):
         """AnswerResult must have all required fields."""
         field_names = {f.name for f in dataclass_fields(AnswerResult)}
-        required = {"question", "department", "confidence", "hits", "fallback_used", "degraded"}
+        required = {"question", "department", "confidence", "hits", "synthesis", "fallback_used", "degraded"}
         self.assertTrue(required.issubset(field_names))
 
     def test_knowledge_result_fields(self):
@@ -310,12 +310,12 @@ class TestServiceRegistryLifecycleGate(unittest.TestCase):
         registry.shutdown()
         registry.shutdown()  # second call must not raise
 
-    @patch("abm.api.core.registry.ChromaController")
-    @patch("abm.api.core.registry.OllamaEmbeddingWrapper")
-    @patch("abm.api.core.registry.OllamaModelGateway")
-    @patch("abm.api.core.registry.ClassificationRouter")
-    @patch("abm.api.core.registry.WorkflowMonitor")
-    @patch("abm.api.core.registry.StrategicAssetAnalyzer")
+    @patch("abm.memory.chroma_controller.ChromaController")
+    @patch("abm.memory.embedding_wrapper.OllamaEmbeddingWrapper")
+    @patch("abm.orchestrator.model_gateway.OllamaModelGateway")
+    @patch("abm.orchestrator.router.ClassificationRouter")
+    @patch("abm.strategic_wing.workflow_monitor.WorkflowMonitor")
+    @patch("abm.strategic_wing.strategic_asset_analyzer.StrategicAssetAnalyzer")
     def test_boot_populates_all_services(
         self, mock_analyzer, mock_monitor, mock_router,
         mock_gateway, mock_embedder, mock_controller
@@ -332,12 +332,12 @@ class TestServiceRegistryLifecycleGate(unittest.TestCase):
         _ = registry.analyzer
         registry.shutdown()
 
-    @patch("abm.api.core.registry.ChromaController")
-    @patch("abm.api.core.registry.OllamaEmbeddingWrapper")
-    @patch("abm.api.core.registry.OllamaModelGateway")
-    @patch("abm.api.core.registry.ClassificationRouter")
-    @patch("abm.api.core.registry.WorkflowMonitor")
-    @patch("abm.api.core.registry.StrategicAssetAnalyzer")
+    @patch("abm.memory.chroma_controller.ChromaController")
+    @patch("abm.memory.embedding_wrapper.OllamaEmbeddingWrapper")
+    @patch("abm.orchestrator.model_gateway.OllamaModelGateway")
+    @patch("abm.orchestrator.router.ClassificationRouter")
+    @patch("abm.strategic_wing.workflow_monitor.WorkflowMonitor")
+    @patch("abm.strategic_wing.strategic_asset_analyzer.StrategicAssetAnalyzer")
     def test_shutdown_clears_all_services(
         self, mock_analyzer, mock_monitor, mock_router,
         mock_gateway, mock_embedder, mock_controller
@@ -351,12 +351,12 @@ class TestServiceRegistryLifecycleGate(unittest.TestCase):
 
     def test_double_boot_is_warned_not_errored(self):
         """Calling boot() a second time must not raise — it logs a warning."""
-        with patch("abm.api.core.registry.ChromaController"), \
-             patch("abm.api.core.registry.OllamaEmbeddingWrapper"), \
-             patch("abm.api.core.registry.OllamaModelGateway"), \
-             patch("abm.api.core.registry.ClassificationRouter"), \
-             patch("abm.api.core.registry.WorkflowMonitor"), \
-             patch("abm.api.core.registry.StrategicAssetAnalyzer"):
+        with patch("abm.memory.chroma_controller.ChromaController"), \
+             patch("abm.memory.embedding_wrapper.OllamaEmbeddingWrapper"), \
+             patch("abm.orchestrator.model_gateway.OllamaModelGateway"), \
+             patch("abm.orchestrator.router.ClassificationRouter"), \
+             patch("abm.strategic_wing.workflow_monitor.WorkflowMonitor"), \
+             patch("abm.strategic_wing.strategic_asset_analyzer.StrategicAssetAnalyzer"):
             registry = _ServiceRegistryDirect()
             registry.boot()
             registry.boot()  # second call: must not raise
@@ -525,6 +525,81 @@ class TestAPICapabilityContractGate(unittest.TestCase):
         self.assertIsInstance(result, AnswerResult)
         self.assertTrue(result.degraded)
         self.assertEqual(result.hits, [])
+
+    def test_answer_question_synthesizes_when_hits_found(self):
+        registry = self._make_registry()
+        mock_router_result = MagicMock()
+        mock_router_result.contract.department = Department.SOFTWARE_ENGINEERING
+        mock_router_result.confidence_hint = "high"
+        mock_router_result.fallback_used = False
+        registry.router.classify.return_value = mock_router_result
+
+        registry.embedder.embed.return_value = [0.1] * 768
+
+        mock_qr = MagicMock()
+        mock_qr.ids = [["123"]]
+        mock_qr.documents = [["This is a test document."]]
+        mock_qr.metadatas = [[{"source": "test"}]]
+        mock_qr.distances = [[0.1]]
+        registry.controller.query_collection.return_value = mock_qr
+
+        mock_gateway_response = MagicMock()
+        mock_gateway_response.text = "This is a synthesized answer."
+        registry.gateway.generate.return_value = mock_gateway_response
+
+        result = answerQuestion("test question", registry=registry)
+
+        registry.gateway.generate.assert_called_once()
+        prompt_arg = registry.gateway.generate.call_args[0][0]
+        self.assertIn("ONLY the facts explicitly present in the provided context", prompt_arg)
+        self.assertIn("- This is a test document.", prompt_arg)
+        
+        self.assertEqual(result.synthesis, "This is a synthesized answer.")
+
+    def test_answer_question_no_synthesis_if_no_hits(self):
+        registry = self._make_registry()
+        mock_router_result = MagicMock()
+        mock_router_result.contract.department = Department.SOFTWARE_ENGINEERING
+        mock_router_result.confidence_hint = "high"
+        mock_router_result.fallback_used = False
+        registry.router.classify.return_value = mock_router_result
+
+        registry.embedder.embed.return_value = [0.1] * 768
+
+        mock_qr = MagicMock()
+        mock_qr.ids = [[]]
+        mock_qr.documents = [[]]
+        mock_qr.metadatas = [[]]
+        mock_qr.distances = [[]]
+        registry.controller.query_collection.return_value = mock_qr
+
+        result = answerQuestion("test question", registry=registry)
+
+        registry.gateway.generate.assert_not_called()
+        self.assertEqual(result.synthesis, "")
+
+    def test_answer_question_synthesis_degrades_gracefully(self):
+        registry = self._make_registry()
+        mock_router_result = MagicMock()
+        mock_router_result.contract.department = Department.SOFTWARE_ENGINEERING
+        mock_router_result.confidence_hint = "high"
+        mock_router_result.fallback_used = False
+        registry.router.classify.return_value = mock_router_result
+
+        registry.embedder.embed.return_value = [0.1] * 768
+
+        mock_qr = MagicMock()
+        mock_qr.ids = [["123"]]
+        mock_qr.documents = [["doc"]]
+        mock_qr.metadatas = [[{}]]
+        mock_qr.distances = [[0.1]]
+        registry.controller.query_collection.return_value = mock_qr
+
+        registry.gateway.generate.side_effect = RuntimeError("gateway failed")
+
+        result = answerQuestion("test question", registry=registry)
+        self.assertTrue(result.degraded)
+        self.assertEqual(result.synthesis, "")
 
     # ── retrieveKnowledge ─────────────────────────────────────────────────────
 
@@ -764,8 +839,8 @@ class TestPriorPhaseRegressionGate(unittest.TestCase):
         self.assertEqual(TaskState.QUARANTINED.value, "QUARANTINED")
         self.assertEqual(TaskState.PASSED.value, "PASSED")
 
-    def test_department_registry_has_five_departments(self):
-        self.assertEqual(len(DEPARTMENT_REGISTRY), 5)
+    def test_department_registry_has_six_departments(self):
+        self.assertEqual(len(DEPARTMENT_REGISTRY), 6)
 
     def test_validation_scores_formula_weights_unchanged(self):
         """The confidence formula weights from v0.4 must not change."""

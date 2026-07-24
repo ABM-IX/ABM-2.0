@@ -94,7 +94,10 @@ class GenerationResponse:
 # ---------------------------------------------------------------------------
 
 
-class OllamaModelGateway:
+from abm.api.core.interfaces import ModelGatewayInterface
+
+
+class OllamaModelGateway(ModelGatewayInterface):
     """
     Thin wrapper around Ollama's ``/api/generate`` endpoint.
 

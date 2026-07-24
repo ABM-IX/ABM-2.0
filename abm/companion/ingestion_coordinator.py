@@ -31,16 +31,15 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from abm.api.core.interfaces import EmbedderInterface, VectorStoreInterface
 from abm.memory.chroma_controller import (
     COLLECTION_AMBIENT_TELEMETRY,
     COLLECTION_CODE_TOPOLOGIES,
-    ChromaController,
 )
 from abm.memory.chunking import (
     chunk_stream_a_code_topologies,
     chunk_stream_c_ambient_telemetry,
 )
-from abm.memory.embedding_wrapper import OllamaEmbeddingWrapper
 
 from .file_watcher import CODE_EXTENSIONS, DEVICE_SOURCE, FileChangeEvent
 from .git_pipeline import DEFAULT_MAX_COMMITS, GitPipeline
@@ -120,8 +119,8 @@ class IngestionCoordinator:
 
     def __init__(
         self,
-        controller: ChromaController,
-        embedder: OllamaEmbeddingWrapper,
+        controller: VectorStoreInterface,
+        embedder: EmbedderInterface,
         git_pipeline: GitPipeline | None = None,
     ) -> None:
         self._controller = controller

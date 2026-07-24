@@ -45,11 +45,10 @@ import time
 from dataclasses import dataclass, field
 from typing import Any
 
+from abm.api.core.interfaces import EmbedderInterface, VectorStoreInterface
 from abm.memory.chroma_controller import (
     COLLECTION_AMBIENT_TELEMETRY,
-    ChromaController,
 )
-from abm.memory.embedding_wrapper import OllamaEmbeddingWrapper
 
 logger = logging.getLogger(__name__)
 
@@ -78,7 +77,7 @@ HOUSEKEEPING_INTERVAL_SECONDS: int = 3_600  # 1 hour
 # ---------------------------------------------------------------------------
 
 
-def _build_archive_controller(archive_persist_dir: str) -> ChromaController:
+def _build_archive_controller(archive_persist_dir: str) -> VectorStoreInterface:
     """
     Construct a *separate* ChromaController for the cold-archive collection.
 
@@ -86,6 +85,8 @@ def _build_archive_controller(archive_persist_dir: str) -> ChromaController:
     keeping the v0.1 ChromaController sealed (PROJECT_BRIEF.md ground rule 2).
     The archive controller creates / retrieves only the single archive collection.
     """
+    from abm.memory.chroma_controller import ChromaController
+
     ctrl = ChromaController(persist_directory=archive_persist_dir, in_memory=False)
     # Ensure the archive collection exists (idempotent via get_or_create)
     try:
@@ -159,8 +160,8 @@ class StreamCRetentionHousekeeper:
 
     def __init__(
         self,
-        controller: ChromaController,
-        embedder: OllamaEmbeddingWrapper,
+        controller: VectorStoreInterface,
+        embedder: EmbedderInterface,
         archive_persist_dir: str = "./memory/chroma_archive",
         housekeeping_interval_seconds: int = HOUSEKEEPING_INTERVAL_SECONDS,
     ) -> None:
@@ -168,8 +169,8 @@ class StreamCRetentionHousekeeper:
         self._embedder = embedder
         self._archive_persist_dir = archive_persist_dir
         self._interval = housekeeping_interval_seconds
-        self._last_run: float = 0.0  # monotonic timestamp of last run
-        self._archive_ctrl: ChromaController | None = None
+        self._last_run: float | None = None  # monotonic timestamp of last run
+        self._archive_ctrl: VectorStoreInterface | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -187,7 +188,7 @@ class StreamCRetentionHousekeeper:
         HousekeeperResult
         """
         now = time.monotonic()
-        if now - self._last_run < self._interval:
+        if self._last_run is not None and (now - self._last_run < self._interval):
             return HousekeeperResult(skipped=True)
 
         self._last_run = now
@@ -226,7 +227,7 @@ class StreamCRetentionHousekeeper:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _archive_controller(self) -> ChromaController:
+    def _archive_controller(self) -> VectorStoreInterface:
         """Lazily construct the cold-archive controller."""
         if self._archive_ctrl is None:
             self._archive_ctrl = _build_archive_controller(self._archive_persist_dir)
@@ -245,13 +246,20 @@ class StreamCRetentionHousekeeper:
             logger.warning("Housekeeper: could not fetch Stream C entries: %s", exc)
             return
 
-        if not raw or not raw.get("ids"):
+        ids_raw = raw.get("ids") if raw is not None else None
+        if raw is None or len(raw) == 0 or ids_raw is None or len(ids_raw) == 0:
             return
 
         ids: list[str] = raw["ids"]
-        metadatas: list[dict] = raw.get("metadatas") or [{}] * len(ids)
-        documents: list[str] = raw.get("documents") or [""] * len(ids)
-        embeddings: list[list[float]] = raw.get("embeddings") or []
+        
+        metas_raw = raw.get("metadatas")
+        metadatas: list[dict] = metas_raw if metas_raw is not None else [{}] * len(ids)
+        
+        docs_raw = raw.get("documents")
+        documents: list[str] = docs_raw if docs_raw is not None else [""] * len(ids)
+        
+        emb_raw = raw.get("embeddings")
+        embeddings: list[list[float]] = emb_raw if emb_raw is not None else []
 
         delete_ids: list[str] = []
         archive_ids: list[str] = []
@@ -331,10 +339,14 @@ class StreamCRetentionHousekeeper:
             + "\n---\n".join(group_docs[:10])  # include up to 10 samples
         )
 
+        import collections
+        devices = [str(m.get("device_source", "dynamic_mobile_node")) for m in group_metas]
+        dominant_device = collections.Counter(devices).most_common(1)[0][0] if devices else "dynamic_mobile_node"
+
         summary_meta: dict[str, Any] = {
-            "epoch_timestamp": now,
+            "epoch_timestamp": max_epoch,
             "active_repository": repos[0] if len(repos) == 1 else ",".join(repos),
-            "device_source": "dynamic_mobile_node",
+            "device_source": dominant_device,
             "lifecycle_stage": "summary",
             "source_kind": source_kind,
             "original_count": len(group_ids),
@@ -400,10 +412,10 @@ class StreamCRetentionHousekeeper:
             meta = dict(metadatas[i])
             doc = documents[i]
             meta["lifecycle_stage"] = "archived"
-            meta["archived_at"] = int(time.time())
+            meta["archived_at"] = time.time() + (i * 0.001)
 
             emb: list[float] | None = (
-                embeddings[i] if embeddings and i < len(embeddings) else None
+                embeddings[i] if embeddings is not None and i < len(embeddings) else None
             )
             if emb is None:
                 try:

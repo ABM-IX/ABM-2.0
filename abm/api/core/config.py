@@ -66,7 +66,7 @@ class APIConfig:
 
     # --- HTTP ---
     connect_timeout: float = 5.0
-    read_timeout: float = 30.0
+    read_timeout: float = 90.0
 
     # --- Retrieval ---
     n_retrieval_results: int = 5

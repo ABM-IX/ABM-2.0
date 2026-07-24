@@ -34,13 +34,13 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from abm.api.core.config import APIConfig
-from abm.memory.chroma_controller import ChromaController
-from abm.memory.embedding_wrapper import OllamaEmbeddingWrapper
-from abm.orchestrator.model_gateway import OllamaModelGateway
-from abm.orchestrator.router import ClassificationRouter
-from abm.strategic_wing.strategic_asset_analyzer import StrategicAssetAnalyzer
-from abm.strategic_wing.workflow_monitor import WorkflowMonitor
-from abm.mobile.ambient_manager import AmbientInteractionManager, ManagerConfig
+from abm.api.core.interfaces import EmbedderInterface, ModelGatewayInterface, VectorStoreInterface
+
+if TYPE_CHECKING:
+    from abm.orchestrator.router import ClassificationRouter
+    from abm.strategic_wing.strategic_asset_analyzer import StrategicAssetAnalyzer
+    from abm.strategic_wing.workflow_monitor import WorkflowMonitor
+    from abm.mobile.ambient_manager import AmbientInteractionManager, ManagerConfig
 
 logger = logging.getLogger(__name__)
 
@@ -96,14 +96,18 @@ class ServiceRegistry:
     Accessing them before ``boot()`` raises ``RuntimeError``.
     """
 
+    _controller: VectorStoreInterface | None
+    _embedder: EmbedderInterface | None
+    _gateway: ModelGatewayInterface | None
+
     def __init__(self, config: APIConfig | None = None) -> None:
         self._config: APIConfig = config or APIConfig()
         self._booted: bool = False
 
         # Service singletons — populated by boot()
-        self._controller: ChromaController | None = None
-        self._embedder: OllamaEmbeddingWrapper | None = None
-        self._gateway: OllamaModelGateway | None = None
+        self._controller: VectorStoreInterface | None = None
+        self._embedder: EmbedderInterface | None = None
+        self._gateway: ModelGatewayInterface | None = None
         self._router: ClassificationRouter | None = None
         self._monitor: WorkflowMonitor | None = None
         self._analyzer: StrategicAssetAnalyzer | None = None
@@ -133,6 +137,14 @@ class ServiceRegistry:
 
         logger.info("ServiceRegistry: booting …")
 
+        from abm.memory.chroma_controller import ChromaController
+        from abm.memory.embedding_wrapper import OllamaEmbeddingWrapper
+        from abm.orchestrator.model_gateway import OllamaModelGateway
+        from abm.orchestrator.router import ClassificationRouter
+        from abm.strategic_wing.strategic_asset_analyzer import StrategicAssetAnalyzer
+        from abm.strategic_wing.workflow_monitor import WorkflowMonitor
+        from abm.mobile.ambient_manager import AmbientInteractionManager, ManagerConfig
+
         # 1. ChromaDB — vector store (v0.1)
         try:
             self._controller = ChromaController(
@@ -156,6 +168,7 @@ class ServiceRegistry:
         # 3. Model gateway — Ollama phi3:mini (v0.3)
         self._gateway = OllamaModelGateway(
             model=self._config.classification_model,
+            timeout_seconds=self._config.read_timeout,
         )
         logger.info("ServiceRegistry: OllamaModelGateway ready.")
 
@@ -283,19 +296,19 @@ class ServiceRegistry:
         return self._config
 
     @property
-    def controller(self) -> ChromaController:
+    def controller(self) -> VectorStoreInterface:
         self._require_booted("controller")
         assert self._controller is not None
         return self._controller
 
     @property
-    def embedder(self) -> OllamaEmbeddingWrapper:
+    def embedder(self) -> EmbedderInterface:
         self._require_booted("embedder")
         assert self._embedder is not None
         return self._embedder
 
     @property
-    def gateway(self) -> OllamaModelGateway:
+    def gateway(self) -> ModelGatewayInterface:
         self._require_booted("gateway")
         assert self._gateway is not None
         return self._gateway

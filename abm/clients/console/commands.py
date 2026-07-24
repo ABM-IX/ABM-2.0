@@ -34,6 +34,7 @@ from abm.api.capabilities import (
     getSystemStatus,
     retrieveKnowledge,
     summarizeProject,
+    runTask,
 )
 from abm.api.core.registry import ServiceRegistry
 from abm.clients.console.formatter import (
@@ -43,6 +44,7 @@ from abm.clients.console.formatter import (
     format_search,
     format_status,
     format_summarize,
+    format_run,
 )
 
 logger = logging.getLogger(__name__)
@@ -150,6 +152,23 @@ def cmd_explain(target: str, *, registry: ServiceRegistry) -> str:
         return f"[explain error]: {exc}"
 
 
+def cmd_run(objective: str, *, registry: ServiceRegistry) -> str:
+    """
+    ``run <objective>`` — classify a task, assign it to a worker sandbox, 
+    and execute it in the background.
+
+    Wires to: ``runTask`` (stable)
+    """
+    logger.debug("cmd_run: objective=%r", objective)
+    try:
+        result = runTask(objective, registry=registry)
+        return format_run(result)
+    except Exception as exc:
+        logger.error("cmd_run: unexpected error — %s", exc)
+        return f"[run error]: {exc}"
+
+
+
 __all__ = [
     "cmd_ask",
     "cmd_search",
@@ -157,4 +176,5 @@ __all__ = [
     "cmd_summarize",
     "cmd_memory",
     "cmd_explain",
+    "cmd_run",
 ]

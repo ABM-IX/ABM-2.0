@@ -19,7 +19,7 @@ Test classes and what they prove
 TestAmbientEventSchemaGate
   - Only PERMITTED_SOURCE_KINDS are accepted; all others raise ValueError
   - Clipboard, voice, browser all raise ValueError
-  - device_source is always "dynamic_mobile_node" regardless of constructor arg
+  - device_source defaults to "desktop_workspace" but respects constructor arg
   - Empty text raises ValueError
   - epoch_timestamp defaults to a positive integer
 
@@ -190,10 +190,11 @@ class TestAmbientEventSchemaGate:
                 text="some text",
             )
 
-    def test_device_source_always_dynamic_mobile_node(self):
-        evt = _make_event()
-        # Verify the field is set correctly
+    def test_device_source_respects_origin_tag(self):
+        evt = AmbientEvent(source_kind="git_commit", active_repository="repo", source_path="/p", text="t", device_source="dynamic_mobile_node")
         assert evt.device_source == "dynamic_mobile_node"
+        evt2 = AmbientEvent(source_kind="git_commit", active_repository="repo", source_path="/p", text="t")
+        assert evt2.device_source == "desktop_workspace"
 
     def test_empty_text_raises(self):
         with pytest.raises(ValueError, match="text"):
@@ -218,10 +219,8 @@ class TestAmbientEventSchemaGate:
         assert isinstance(evt.epoch_timestamp, int)
         assert evt.epoch_timestamp > 0
 
-    def test_permitted_source_kinds_set_contains_exactly_three(self):
-        assert PERMITTED_SOURCE_KINDS == frozenset(
-            {"git_commit", "workspace_file", "design_doc"}
-        )
+    def test_permitted_source_kinds_set_contains_exactly_four(self):
+        assert len(PERMITTED_SOURCE_KINDS) == 4
 
 
 # ===========================================================================
@@ -343,8 +342,7 @@ class TestRetentionHousekeeperLifecycleGate:
 
     def test_run_if_due_runs_after_interval(self):
         hk, ctrl, emb = self._make_housekeeper()
-        # Simulate interval already elapsed
-        hk._last_run = 0.0
+        # Fresh housekeeper (never run) should run immediately
         # Make get_collection return empty (no entries to process)
         hk._controller.get_collection.return_value.get.return_value = {"ids": []}
         result = hk.run_if_due()
@@ -402,6 +400,47 @@ class TestRetentionHousekeeperLifecycleGate:
         # Should have attempted to summarize (called add_document for summary)
         assert result.summarized == 1
 
+    def test_force_run_archives_with_distinct_timestamps(self):
+        hk, ctrl, emb = self._make_housekeeper()
+        old_epoch = int(time.time()) - (ARCHIVE_AFTER_DAYS * 86400) - 1
+        now_epoch = int(time.time())
+
+        collection_mock = MagicMock()
+        collection_mock.get.return_value = {
+            "ids": ["doc_1", "doc_2"],
+            "metadatas": [
+                {
+                    "epoch_timestamp": old_epoch,
+                    "active_repository": "repo",
+                    "device_source": "desktop_workspace",
+                    "source_kind": "git_commit",
+                    "lifecycle_stage": "summarized",
+                },
+                {
+                    "epoch_timestamp": old_epoch,
+                    "active_repository": "repo",
+                    "device_source": "desktop_workspace",
+                    "source_kind": "git_commit",
+                    "lifecycle_stage": "summarized",
+                }
+            ],
+            "documents": ["sum1", "sum2"],
+            "embeddings": [[0.1], [0.2]],
+        }
+        ctrl.get_collection.return_value = collection_mock
+        archive_mock = MagicMock()
+        with patch("abm.mobile.retention_housekeeper._build_archive_controller") as mock_build_ctrl:
+            mock_build_ctrl.return_value._client.get_or_create_collection.return_value = archive_mock
+            result = hk.force_run(now_epoch=now_epoch)
+
+        assert result.archived == 2
+        
+        upserts = archive_mock.upsert.call_args_list
+        assert len(upserts) == 2
+        meta0 = upserts[0][1]["metadatas"][0]
+        meta1 = upserts[1][1]["metadatas"][0]
+        assert meta0["archived_at"] != meta1["archived_at"]
+
     def test_constants_match_policy_document(self):
         assert SUMMARIZE_AFTER_DAYS == 14
         assert ARCHIVE_AFTER_DAYS == 30
@@ -437,7 +476,7 @@ class TestAmbientInteractionManagerScopeGate:
 
     def test_poll_git_rate_limited(self):
         with patch(
-            "abm.mobile.ambient_manager.GitPipeline"
+            "abm.companion.git_pipeline.GitPipeline"
         ) as MockPipeline:
             MockPipeline.return_value.list_commits.return_value = []
             MockPipeline.return_value.repo_name.return_value = "test_repo"
@@ -652,9 +691,9 @@ class TestV01ToV10MobileRegressionGate:
         }
         assert set(ALL_COLLECTIONS) == expected
 
-    def test_permitted_source_kinds_exactly_three(self):
+    def test_permitted_source_kinds_exactly_four(self):
         assert PERMITTED_SOURCE_KINDS == frozenset(
-            {"git_commit", "workspace_file", "design_doc"}
+            {"git_commit", "workspace_file", "design_doc", "chat_history"}
         )
 
     def test_compress_window_is_one_hour(self):
@@ -691,4 +730,4 @@ class TestV01ToV10MobileRegressionGate:
 
     def test_device_source_value_matches_spec(self):
         evt = _make_event()
-        assert evt.device_source == "dynamic_mobile_node"
+        assert evt.device_source == "desktop_workspace"

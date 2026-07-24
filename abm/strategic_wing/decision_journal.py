@@ -8,12 +8,11 @@ A durable record of strategic decisions written into Stream D.
 import time
 import uuid
 
+from abm.api.core.interfaces import EmbedderInterface, VectorStoreInterface
 from abm.memory.chroma_controller import (
     COLLECTION_COGNITIVE_IDENTITY,
     SCHEMA_COGNITIVE_IDENTITY,
-    ChromaController,
 )
-from abm.memory.embedding_wrapper import OllamaEmbeddingWrapper
 
 
 class DecisionJournal:
@@ -25,7 +24,7 @@ class DecisionJournal:
     """
 
     def __init__(
-        self, controller: ChromaController, embedder: OllamaEmbeddingWrapper
+        self, controller: VectorStoreInterface, embedder: EmbedderInterface
     ) -> None:
         self.controller = controller
         self.embedder = embedder

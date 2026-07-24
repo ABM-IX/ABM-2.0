@@ -42,6 +42,11 @@
         android:fullBackupContent="false"
         android:dataExtractionRules="@xml/data_extraction_rules">
 
+        <!-- flutterEmbedding v2 meta-data -->
+        <meta-data
+            android:name="flutterEmbedding"
+            android:value="2" />
+
         <!-- Main Flutter activity -->
         <activity
             android:name=".MainActivity"

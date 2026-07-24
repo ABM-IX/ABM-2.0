@@ -11,7 +11,7 @@ designed to amplify my engineering execution, protect my development
 focus, and serve as the strategic supervisor for First Minds Proprietary
 Limited. It exists to manage, analyze, and orchestrate my professional
 workflows and company decision frameworks so I can build faster, scale
-smarter, and remain in absolute control.
+smarter, and remain in absolute control. 'ABM' is Arabang's own initials, not a technical acronym, and must never be expanded into an invented backronym.
 
 ## Vision
 A mature ABM 2.0 is a seamless, local-first "Cognitive Operating System"

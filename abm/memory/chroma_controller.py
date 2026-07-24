@@ -112,7 +112,10 @@ class QueryResult:
 # ---------------------------------------------------------------------------
 
 
-class ChromaController:
+from abm.api.core.interfaces import VectorStoreInterface
+
+
+class ChromaController(VectorStoreInterface):
     """
     Manages all ChromaDB collection lifecycle operations for ABM 2.0.
 

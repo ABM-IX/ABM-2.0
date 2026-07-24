@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../bloc/foreground_bloc.dart';
+import '../../sync/ui/pairing_screen.dart';
 
 class ForegroundStatusWidget extends StatelessWidget {
   const ForegroundStatusWidget({super.key});
@@ -86,8 +87,30 @@ class ForegroundStatusWidget extends StatelessWidget {
                     ),
                   ],
                 ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: TextButton.icon(
+                    onPressed: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const PairingScreen(),
+                      ),
+                    ),
+                    icon: const Icon(Icons.qr_code_rounded, size: 18),
+                    label: const Text('Pair with Desktop'),
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF58A6FF),
+                      backgroundColor: const Color(0xFF1F2428),
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ),
               ],
             ),
+
           ),
         );
       },

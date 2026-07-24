@@ -68,7 +68,7 @@ class AmbientTelemetryMetadata(_StrictMetadataModel):
 
     epoch_timestamp: StrictInt
     active_repository: Literal["smart_transit", "houseconnect"]
-    device_source: Literal["dynamic_mobile_node"]
+    device_source: Literal["dynamic_mobile_node", "desktop_workspace"]
 
 
 __all__ = [

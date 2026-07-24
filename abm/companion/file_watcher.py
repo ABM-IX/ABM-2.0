@@ -55,7 +55,7 @@ CODE_EXTENSIONS: frozenset[str] = frozenset(
 )
 
 #: device_source value per spec hardware-agnostic blueprint update (section 10 addendum).
-DEVICE_SOURCE: str = "dynamic_mobile_node"
+DEVICE_SOURCE: str = "desktop_workspace"
 
 #: Default debounce window in seconds.
 DEFAULT_DEBOUNCE_SECONDS: float = 1.0
@@ -88,6 +88,7 @@ EXCLUDED_DIRS: frozenset[str] = frozenset(
         "__pypackages__",# PEP 582 local packages
         ".DS_Store",     # macOS Finder metadata (dir variant)
         "Thumbs.db",     # Windows thumbnail cache (dir variant)
+        "memory",        # ABM memory directory including chroma_store
     }
 )
 
@@ -317,10 +318,15 @@ class _DebounceHandler(FileSystemEventHandler):
 
     def _dispatch(self, path: str, event_type: str) -> None:
         """Build a FileChangeEvent and route it to the correct callback."""
+        try:
+            mtime = int(os.path.getmtime(path))
+        except OSError:
+            mtime = int(time.time())
+
         evt = FileChangeEvent(
             path=path,
             event_type=event_type,
-            epoch_timestamp=int(time.time()),
+            epoch_timestamp=mtime,
             repository=_infer_repository(path),
         )
         logger.debug(

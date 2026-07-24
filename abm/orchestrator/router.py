@@ -50,11 +50,12 @@ import re
 import time
 from typing import Any
 
-from abm.memory.chroma_controller import (
-    COLLECTION_COGNITIVE_IDENTITY,
-    ChromaController,
+from abm.api.core.interfaces import (
+    EmbedderInterface,
+    ModelGatewayInterface,
+    VectorStoreInterface,
 )
-from abm.memory.embedding_wrapper import OllamaEmbeddingWrapper
+from abm.memory.chroma_controller import COLLECTION_COGNITIVE_IDENTITY
 
 from .departments import (
     Department,
@@ -62,7 +63,7 @@ from .departments import (
     department_from_string,
     get_sandbox,
 )
-from .model_gateway import ModelGatewayError, OllamaModelGateway
+from .model_gateway import ModelGatewayError
 from .task_contract import RouterResult, TaskContract
 
 logger = logging.getLogger(__name__)
@@ -127,22 +128,22 @@ class ClassificationRouter:
 
     Parameters
     ----------
-    gateway : OllamaModelGateway
+    gateway : ModelGatewayInterface
         The model gateway used to call phi3:mini. Must be pre-configured
         with the correct model and loopback address.
-    controller : ChromaController | None
+    controller : VectorStoreInterface | None
         Optional ChromaDB controller for Stream D context injection.
         If ``None``, context injection is skipped.
-    embedder : OllamaEmbeddingWrapper | None
+    embedder : EmbedderInterface | None
         Optional embedding wrapper needed for the Stream D query.
         Required if ``controller`` is provided; ignored if ``controller`` is ``None``.
     """
 
     def __init__(
         self,
-        gateway: OllamaModelGateway,
-        controller: ChromaController | None = None,
-        embedder: OllamaEmbeddingWrapper | None = None,
+        gateway: ModelGatewayInterface,
+        controller: VectorStoreInterface | None = None,
+        embedder: EmbedderInterface | None = None,
     ) -> None:
         self._gateway = gateway
         self._controller = controller

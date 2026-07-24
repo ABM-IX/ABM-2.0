@@ -18,7 +18,7 @@ dependencies:
   # Maintained plugin for Android Foreground Service — device-agnostic,
   # persistent notification, prevents OS low-memory killer from terminating
   # the execution thread. PROJECT_BRIEF.md ground rule 6 compliance.
-  flutter_foreground_task: ^8.0.0
+  flutter_foreground_task: ^9.2.2
 
   # ── State Management ──────────────────────────────────────────────────────
   # BLoC pattern per PROJECT_BRIEF.md ground rule 6 and Stream A schema
@@ -35,6 +35,12 @@ dependencies:
   # Architectural Constitution rule 7 — no hand-rolled cryptography.
   flutter_secure_storage: ^9.2.2
   cryptography: ^2.7.0
+
+  # ── Settings (non-secret runtime config) ─────────────────────────────────
+  # Persists the desktop sync base URL so the user can change it from the
+  # settings screen without a rebuild. Not for secrets — use
+  # flutter_secure_storage for those.
+  shared_preferences: ^2.3.2
 
   # ── Utilities ─────────────────────────────────────────────────────────────
   path_provider: ^2.1.4

@@ -44,7 +44,10 @@ READ_TIMEOUT: float = 30.0
 # ---------------------------------------------------------------------------
 
 
-class OllamaEmbeddingWrapper:
+from abm.api.core.interfaces import EmbedderInterface
+
+
+class OllamaEmbeddingWrapper(EmbedderInterface):
     """
     Connects to a local Ollama instance and produces text embeddings using
     ``nomic-embed-text``.

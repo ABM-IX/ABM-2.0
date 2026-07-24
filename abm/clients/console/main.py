@@ -54,6 +54,7 @@ from abm.clients.console.commands import (
     cmd_search,
     cmd_status,
     cmd_summarize,
+    cmd_run,
 )
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -115,6 +116,13 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     ask_p.add_argument("question", nargs="+", help="The question to ask.")
 
+    # run
+    run_p = subparsers.add_parser(
+        "run",
+        help="Classify a task and dispatch it to a worker sandbox.",
+    )
+    run_p.add_argument("description", nargs="+", help="The task description.")
+
     # search
     search_p = subparsers.add_parser(
         "search",
@@ -160,6 +168,10 @@ def main(argv: list[str] | None = None) -> int:
     """
     Entry point.  Returns the process exit code (0 = success, 1 = error).
     """
+    # Fix UnicodeEncodeError when printing '─' or '█' on Windows consoles
+    if sys.stdout.encoding.lower() != 'utf-8':
+        sys.stdout.reconfigure(encoding='utf-8')
+
     parser = _build_parser()
     args = parser.parse_args(argv)
 
@@ -189,6 +201,10 @@ def main(argv: list[str] | None = None) -> int:
         if cmd == "ask":
             question = " ".join(args.question)
             output = cmd_ask(question, registry=registry)
+
+        elif cmd == "run":
+            description = " ".join(args.description)
+            output = cmd_run(description, registry=registry)
 
         elif cmd == "search":
             query = " ".join(args.query)

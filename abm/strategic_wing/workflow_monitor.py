@@ -10,7 +10,7 @@ from dataclasses import dataclass
 from enum import Enum
 
 from abm.orchestrator.task_contract import TaskContract
-from abm.sandbox.models import ExecutionResult, GateResult
+from abm.sandbox.models import ExecutionResult, GateResult, ValidationScores
 
 
 class TaskState(Enum):
@@ -27,6 +27,7 @@ class TaskRecord:
     state: TaskState
     execution_result: ExecutionResult | None = None
     gate_result: GateResult | None = None
+    validation_scores: ValidationScores | None = None
 
 
 class WorkflowMonitor:
@@ -56,10 +57,14 @@ class WorkflowMonitor:
             self._registry[contract_id].execution_result = result
             self._registry[contract_id].state = TaskState.EXECUTED
 
-    def record_gate_result(self, contract_id: str, gate: GateResult) -> None:
+    def record_gate_result(
+        self, contract_id: str, gate: GateResult, scores: ValidationScores | None = None
+    ) -> None:
         """Record the final Math Validation Gate evaluation."""
         if contract_id in self._registry:
             self._registry[contract_id].gate_result = gate
+            if scores is not None:
+                self._registry[contract_id].validation_scores = scores
             self._registry[contract_id].state = (
                 TaskState.PASSED if gate.passed else TaskState.QUARANTINED
             )

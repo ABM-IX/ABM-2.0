@@ -328,6 +328,14 @@ class TestWatcherCreateModifyDeleteGate(unittest.TestCase):
         self.assertNotIn(COLLECTION_TECHNICAL_MASTERY, collections)
         self.assertNotIn(COLLECTION_COGNITIVE_IDENTITY, collections)
 
+    def test_memory_directory_is_excluded_from_watch_events(self):
+        """A change inside memory/ is never treated as a watchable event."""
+        handler, code, telem = self._make_handler()
+        handler.on_modified(_fs_event("/workspace/memory/chroma_store/chroma.sqlite3"))
+        handler.on_created(_fs_event("/workspace/deep/memory/logs.txt"))
+        # Excluded files never enter the pending queue
+        self.assertEqual(len(handler._pending), 0)
+
 
 # ---------------------------------------------------------------------------
 # HARD GATE 2 — Git integration reads commit / branch state
@@ -791,10 +799,20 @@ class TestFileChangeEventShape(unittest.TestCase):
         self.assertTrue(self.evt.is_code_file)
 
     def test_device_source_is_dynamic_mobile_node(self):
-        self.assertEqual(self.evt.device_source, "dynamic_mobile_node")
+        """
+        In v0.2, device_source was assumed to always be dynamic_mobile_node. 
+        However, for v1.0, the desktop file watcher generates telemetry that must be 
+        differentiated from genuine mobile events. Thus, the default is now desktop_workspace.
+        """
+        self.assertEqual(self.evt.device_source, "desktop_workspace")
 
     def test_device_source_constant_matches_spec(self):
-        self.assertEqual(DEVICE_SOURCE, "dynamic_mobile_node")
+        """
+        In v0.2, DEVICE_SOURCE was hardcoded to dynamic_mobile_node. 
+        As of v1.0, this was changed to desktop_workspace to correctly attribute 
+        desktop-originated events, differentiating them from mobile sync payload events.
+        """
+        self.assertEqual(DEVICE_SOURCE, "desktop_workspace")
 
     def test_md_file_is_not_code_file(self):
         evt = FileChangeEvent(

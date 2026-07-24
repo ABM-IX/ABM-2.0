@@ -13,7 +13,7 @@ import '../crypto/sync_crypto_channel.dart';
 import '../models/encrypted_sync_payload.dart';
 import '../models/sync_handshake.dart';
 
-const String kDefaultSyncBaseUrl = 'http://127.0.0.1:8765';
+
 const String kSyncHandshakeEndpoint = '/api/sync/handshake';
 const String kSyncPayloadEndpoint = '/api/sync/payload';
 const Duration kSyncRequestTimeout = Duration(seconds: 10);

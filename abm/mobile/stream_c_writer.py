@@ -39,11 +39,10 @@ import logging
 import time
 from dataclasses import dataclass
 
+from abm.api.core.interfaces import EmbedderInterface, VectorStoreInterface
 from abm.memory.chroma_controller import (
     COLLECTION_AMBIENT_TELEMETRY,
-    ChromaController,
 )
-from abm.memory.embedding_wrapper import OllamaEmbeddingWrapper
 
 from .event_models import AmbientEvent, PERMITTED_SOURCE_KINDS
 from .retention_housekeeper import StreamCRetentionHousekeeper
@@ -114,8 +113,8 @@ class StreamCWriter:
 
     def __init__(
         self,
-        controller: ChromaController,
-        embedder: OllamaEmbeddingWrapper,
+        controller: VectorStoreInterface,
+        embedder: EmbedderInterface,
         housekeeper: StreamCRetentionHousekeeper,
         compress_window_seconds: int = COMPRESS_WINDOW_SECONDS,
     ) -> None:
@@ -172,10 +171,10 @@ class StreamCWriter:
                 status="invalid",
                 reason="active_repository must be a string.",
             )
-        if event.device_source != "dynamic_mobile_node":
+        if event.device_source not in ("dynamic_mobile_node", "desktop_workspace"):
             return WriteResult(
                 status="invalid",
-                reason="device_source must be 'dynamic_mobile_node'.",
+                reason="device_source must be 'dynamic_mobile_node' or 'desktop_workspace'.",
             )
 
         # ── Stage 3: Compress (dedup) ─────────────────────────────────

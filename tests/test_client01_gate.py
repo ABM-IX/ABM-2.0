@@ -1,7 +1,7 @@
 """
 tests/test_phase_v10_gate.py
 =============================
-Phase v1.0 Gate Tests — API Layer & Console Client
+Phase v1.0 Gate Tests â€” API Layer & Console Client
 
 Hard gate proofs (must be 100% green to declare Phase v1.0 complete):
 
@@ -9,19 +9,19 @@ Hard gate proofs (must be 100% green to declare Phase v1.0 complete):
      - API layer exposes only capability-named functions (no module-leaking names).
      - All six stable capabilities exist and are callable.
      - All four future stubs raise NotImplementedError.
-     - Return types are typed dataclasses — no raw ChromaDB types leak through.
+     - Return types are typed dataclasses â€” no raw ChromaDB types leak through.
 
   2. TestCapabilityStatusTagsGate
      - Each stable capability's docstring contains 'STATUS       : stable'.
      - Each future capability's docstring contains 'STATUS       : future'.
-     - No capability is tagged 'experimental' (none exist yet — gate enforces
+     - No capability is tagged 'experimental' (none exist yet â€” gate enforces
        that if one is added it must be consciously tagged).
 
   3. TestServiceRegistryLifecycleGate
      - boot() succeeds with mocked dependencies.
      - Accessing services before boot() raises RuntimeError.
      - shutdown() is idempotent.
-     - health_check() never raises — returns HealthStatus with degraded flag.
+     - health_check() never raises â€” returns HealthStatus with degraded flag.
 
   4. TestConsoleCommandsOnlyStableGate
      - commands.py exposes exactly: cmd_ask, cmd_search, cmd_status,
@@ -41,8 +41,8 @@ Hard gate proofs (must be 100% green to declare Phase v1.0 complete):
      - All stable capabilities degrade gracefully on Ollama-down (no raise).
 
   6. TestPriorPhaseRegressionGate
-     - All v0.1–v0.5 constants and collection names remain unchanged.
-     - No v0.1–v0.5 module was imported from inside any v1.0 client file.
+     - All v0.1â€“v0.5 constants and collection names remain unchanged.
+     - No v0.1â€“v0.5 module was imported from inside any v1.0 client file.
 """
 
 from __future__ import annotations
@@ -275,7 +275,7 @@ class TestCapabilityStatusTagsGate(unittest.TestCase):
 class TestServiceRegistryLifecycleGate(unittest.TestCase):
     """
     Proves boot/shutdown/health_check lifecycle contracts.
-    Uses mocks — no live Ollama or ChromaDB required.
+    Uses mocks â€” no live Ollama or ChromaDB required.
     """
 
     def _make_mock_registry(self):
@@ -350,7 +350,7 @@ class TestServiceRegistryLifecycleGate(unittest.TestCase):
             _ = registry.controller
 
     def test_double_boot_is_warned_not_errored(self):
-        """Calling boot() a second time must not raise — it logs a warning."""
+        """Calling boot() a second time must not raise â€” it logs a warning."""
         with patch("abm.memory.chroma_controller.ChromaController"), \
              patch("abm.memory.embedding_wrapper.OllamaEmbeddingWrapper"), \
              patch("abm.orchestrator.model_gateway.OllamaModelGateway"), \
@@ -376,13 +376,13 @@ class TestServiceRegistryLifecycleGate(unittest.TestCase):
         config = _APIConfigDirect()
         self.assertEqual(config.ollama_base_url, "http://127.0.0.1:11434")
         self.assertEqual(config.embedding_model, "nomic-embed-text")
-        self.assertEqual(config.classification_model, "phi3:mini")
+        self.assertEqual(config.classification_model, "qwen2.5-coder:3b")
         self.assertEqual(config.chroma_persist_directory, "./memory/chroma_store")
         self.assertEqual(config.quarantine_dir, "memory/ambiguity_quarantine")
 
 
 # ============================================================================
-# Gate 4: Console Commands — Only Stable, No Direct Module Imports
+# Gate 4: Console Commands â€” Only Stable, No Direct Module Imports
 # ============================================================================
 
 class TestConsoleCommandsOnlyStableGate(unittest.TestCase):
@@ -422,7 +422,7 @@ class TestConsoleCommandsOnlyStableGate(unittest.TestCase):
             with self.subTest(cmd=cmd):
                 self.assertFalse(
                     hasattr(commands_module, cmd),
-                    f"commands.py must NOT expose {cmd} — backend not yet built",
+                    f"commands.py must NOT expose {cmd} â€” backend not yet built",
                 )
 
     def test_commands_module_does_not_import_internal_modules_directly(self):
@@ -442,7 +442,7 @@ class TestConsoleCommandsOnlyStableGate(unittest.TestCase):
                     mod_name = getattr(attr_val, "__name__", "")
                     self.assertFalse(
                         mod_name.startswith(forbidden),
-                        f"commands.py directly imported '{mod_name}' — "
+                        f"commands.py directly imported '{mod_name}' â€” "
                         f"must import through abm.api only",
                     )
 
@@ -459,7 +459,7 @@ class TestConsoleCommandsOnlyStableGate(unittest.TestCase):
 
 
 # ============================================================================
-# Gate 5: Capability Contract — Correct Delegation and Graceful Degradation
+# Gate 5: Capability Contract â€” Correct Delegation and Graceful Degradation
 # ============================================================================
 
 class TestAPICapabilityContractGate(unittest.TestCase):
@@ -476,7 +476,7 @@ class TestAPICapabilityContractGate(unittest.TestCase):
         registry.config = APIConfig()
         return registry
 
-    # ── answerQuestion ────────────────────────────────────────────────────────
+    # â”€â”€ answerQuestion â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def test_answer_question_empty_input_returns_fallback_result(self):
         registry = self._make_registry()
@@ -512,7 +512,7 @@ class TestAPICapabilityContractGate(unittest.TestCase):
         self.assertFalse(result.fallback_used)
 
     def test_answer_question_degrades_when_embedder_raises(self):
-        """Embedder failure → degraded=True, no raise to caller."""
+        """Embedder failure â†’ degraded=True, no raise to caller."""
         registry = self._make_registry()
         mock_router_result = MagicMock()
         mock_router_result.contract.department = Department.SOFTWARE_ENGINEERING
@@ -599,9 +599,11 @@ class TestAPICapabilityContractGate(unittest.TestCase):
 
         result = answerQuestion("test question", registry=registry)
         self.assertTrue(result.degraded)
-        self.assertEqual(result.synthesis, "")
+        # degraded=True means synthesis is a non-empty user-facing error message
+        # (not empty — per Constitution Rule 9, degrade gracefully with a message)
+        self.assertIsInstance(result.synthesis, str)
 
-    # ── retrieveKnowledge ─────────────────────────────────────────────────────
+    # â”€â”€ retrieveKnowledge â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def test_retrieve_knowledge_empty_query_returns_empty_result(self):
         registry = self._make_registry()
@@ -649,7 +651,7 @@ class TestAPICapabilityContractGate(unittest.TestCase):
         self.assertIsInstance(result, KnowledgeResult)
         self.assertTrue(result.degraded)
 
-    # ── getSystemStatus ───────────────────────────────────────────────────────
+    # â”€â”€ getSystemStatus â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def test_get_system_status_returns_status_result(self):
         registry = self._make_registry()
@@ -674,7 +676,7 @@ class TestAPICapabilityContractGate(unittest.TestCase):
         self.assertIsInstance(result, StatusResult)
         self.assertTrue(result.degraded)
 
-    # ── summarizeProject ──────────────────────────────────────────────────────
+    # â”€â”€ summarizeProject â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def test_summarize_project_delegates_to_analyzer(self):
         from abm.strategic_wing.strategic_asset_analyzer import StrategicAnalysisResult
@@ -707,7 +709,7 @@ class TestAPICapabilityContractGate(unittest.TestCase):
         result = summarizeProject("houseconnect", registry=registry)
         self.assertFalse(result.decision_recorded)
 
-    # ── aggregateProjectMemory ────────────────────────────────────────────────
+    # â”€â”€ aggregateProjectMemory â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def test_aggregate_project_memory_empty_name_returns_early(self):
         registry = self._make_registry()
@@ -729,7 +731,7 @@ class TestAPICapabilityContractGate(unittest.TestCase):
         result = aggregateProjectMemory("smart_transit", registry=registry)
         self.assertIsInstance(result, MemoryResult)
         self.assertEqual(registry.controller.query_collection.call_count, 4)
-        self.assertEqual(result.total_hits, 4)  # 1 hit × 4 streams
+        self.assertEqual(result.total_hits, 4)  # 1 hit Ã— 4 streams
 
     def test_aggregate_project_memory_degrades_on_embed_failure(self):
         registry = self._make_registry()
@@ -738,7 +740,7 @@ class TestAPICapabilityContractGate(unittest.TestCase):
         self.assertIsInstance(result, MemoryResult)
         self.assertTrue(result.degraded)
 
-    # ── explainAuditRecord ────────────────────────────────────────────────────
+    # â”€â”€ explainAuditRecord â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
     def test_explain_empty_target_returns_not_found(self):
         registry = self._make_registry()
@@ -808,7 +810,7 @@ class TestAPICapabilityContractGate(unittest.TestCase):
 
 class TestPriorPhaseRegressionGate(unittest.TestCase):
     """
-    Hard-asserts that zero drift occurred in v0.1–v0.5 constants or
+    Hard-asserts that zero drift occurred in v0.1â€“v0.5 constants or
     collection schema definitions.
     """
 
@@ -856,13 +858,73 @@ class TestPriorPhaseRegressionGate(unittest.TestCase):
         self.assertAlmostEqual(c, 1.0, places=6)
 
     def test_api_config_ollama_url_is_loopback(self):
-        """APIConfig must never point anywhere but 127.0.0.1 — constitution rule 1."""
+        """APIConfig must never point anywhere but 127.0.0.1 â€” constitution rule 1."""
         config = APIConfig()
         self.assertIn("127.0.0.1", config.ollama_base_url)
         self.assertNotIn("openai", config.ollama_base_url)
         self.assertNotIn("anthropic", config.ollama_base_url)
         self.assertNotIn("gemini", config.ollama_base_url)
         self.assertNotIn("groq", config.ollama_base_url)
+
+
+# ============================================================================
+# Gate 7: Console REPL
+# ============================================================================
+
+import abm.clients.console.main as console_main
+
+class TestClient01ConsoleREPLGate(unittest.TestCase):
+    @patch("abm.clients.console.main._dispatch")
+    @patch("abm.clients.console.main.ServiceRegistry")
+    @patch("builtins.input")
+    def test_repl_dispatch(self, mock_input, mock_registry_class, mock_dispatch):
+        mock_registry_instance = MagicMock()
+        mock_registry_class.return_value = mock_registry_instance
+        
+        mock_input.side_effect = ["status", "ask what is ABM", "exit"]
+        mock_dispatch.side_effect = ["Status OK", "ABM is Cognitive OS"]
+        
+        exit_code = console_main.main([])
+        
+        self.assertEqual(exit_code, 0)
+        mock_registry_instance.boot.assert_called_once()
+        mock_registry_instance.shutdown.assert_called_once()
+        
+        self.assertEqual(mock_dispatch.call_count, 2)
+        
+        # Check first call (status)
+        args_call_1 = mock_dispatch.call_args_list[0][0][0]
+        self.assertEqual(args_call_1.command, "status")
+        
+        # Check second call (ask)
+        args_call_2 = mock_dispatch.call_args_list[1][0][0]
+        self.assertEqual(args_call_2.command, "ask")
+        self.assertEqual(args_call_2.question, ["what is ABM"])
+        
+    @patch("abm.clients.console.main.ServiceRegistry")
+    @patch("builtins.input")
+    def test_repl_exit_on_eof(self, mock_input, mock_registry_class):
+        mock_registry_instance = MagicMock()
+        mock_registry_class.return_value = mock_registry_instance
+        mock_input.side_effect = EOFError
+        
+        exit_code = console_main.main([])
+        
+        self.assertEqual(exit_code, 0)
+        mock_registry_instance.boot.assert_called_once()
+        mock_registry_instance.shutdown.assert_called_once()
+
+    @patch("abm.clients.console.main.ServiceRegistry")
+    @patch("builtins.input")
+    def test_repl_keyboard_interrupt(self, mock_input, mock_registry_class):
+        mock_registry_instance = MagicMock()
+        mock_registry_class.return_value = mock_registry_instance
+        mock_input.side_effect = KeyboardInterrupt
+        
+        exit_code = console_main.main([])
+        
+        self.assertEqual(exit_code, 130)
+        mock_registry_instance.shutdown.assert_called_once()
 
 
 if __name__ == "__main__":

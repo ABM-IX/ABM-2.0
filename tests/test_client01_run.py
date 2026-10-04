@@ -19,6 +19,14 @@ def is_ollama_running():
     except Exception:
         return False
 
+import subprocess
+def is_docker_running():
+    try:
+        subprocess.run(["docker", "info"], check=True, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        return True
+    except Exception:
+        return False
+
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from abm.api.capabilities import runTask, RunTaskResult
@@ -39,6 +47,7 @@ class TestClient01Run(unittest.TestCase):
         cls.registry.shutdown()
 
     @unittest.skipIf(not is_ollama_running(), "Ollama not running")
+    @unittest.skipIf(not is_docker_running(), "Docker not running")
     def test_runTask_end_to_end(self):
         # Dispatch a trivial python script
         objective = "write a python script that prints hello world"

@@ -1,7 +1,7 @@
-"""
+﻿"""
 abm/orchestrator/router.py
 ============================
-Classification Router — Phase v0.3 Executive Orchestrator Engine
+Classification Router â€” Phase v0.3 Executive Orchestrator Engine
 Spec Reference: ABM_SPEC.md sections 4, 5, and 10 (item 3)
 
 The non-generating classification router node. Given an incoming task
@@ -12,24 +12,24 @@ THE FUNDAMENTAL CONSTRAINT (spec section 5):
   This class is programmatically banned from generating any raw code
   or text explanations. It does NOT have generate(), write(), respond(),
   explain(), or complete() methods. Its only public output is a
-  RouterResult — a structured routing decision.
+  RouterResult â€” a structured routing decision.
 
 Architecture:
   ClassificationRouter
-    │
-    ├── OllamaModelGateway  ← calls phi3:mini for classification
-    │     (no text generation — only a JSON-shaped prompt)
-    │
-    ├── ChromaController    ← optional Stream D context injection
-    │     (read-only, never writes during classification)
-    │
-    ├── DEPARTMENT_REGISTRY ← looks up sandbox config
-    │
-    └── TaskContract.build() ← assembles the delegation contract
+    â”‚
+    â”œâ”€â”€ OllamaModelGateway  â† calls qwen2.5-coder:3b for classification
+    â”‚     (no text generation â€” only a JSON-shaped prompt)
+    â”‚
+    â”œâ”€â”€ ChromaController    â† optional Stream D context injection
+    â”‚     (read-only, never writes during classification)
+    â”‚
+    â”œâ”€â”€ DEPARTMENT_REGISTRY â† looks up sandbox config
+    â”‚
+    â””â”€â”€ TaskContract.build() â† assembles the delegation contract
 
 Design contract:
   - classify() is the ONLY public action method.
-  - is_available() is the ONLY other public method — it checks Ollama health.
+  - is_available() is the ONLY other public method â€” it checks Ollama health.
   - Fallback policy: any failure (Ollama down, bad JSON, unknown department)
     returns department=software_engineering with confidence_hint="low" and
     fallback_used=True. The router NEVER raises to its caller.
@@ -37,7 +37,7 @@ Design contract:
     the router performs a top-1 semantic query against abm_cognitive_identity
     before building the prompt. This grounds the classification in ABM's
     actual strategic priorities. Gracefully skipped on any error.
-  - The prompt instructs phi3:mini to return ONLY a JSON object:
+  - The prompt instructs qwen2.5-coder:3b to return ONLY a JSON object:
     {"department": "<value>", "confidence": "<high|medium|low>"}
     Any extra prose is stripped during JSON extraction.
 """
@@ -75,7 +75,7 @@ logger = logging.getLogger(__name__)
 #: Default department when classification fails or is ambiguous.
 FALLBACK_DEPARTMENT: Department = Department.SOFTWARE_ENGINEERING
 
-#: Maximum characters of task description sent to phi3:mini.
+#: Maximum characters of task description sent to qwen2.5-coder:3b.
 MAX_TASK_DESCRIPTION_CHARS: int = 2000
 
 #: Valid confidence hint values.
@@ -120,7 +120,7 @@ class ClassificationRouter:
     The non-generating classification router node.
 
     Accepts a task description string, classifies it into a department using
-    phi3:mini via the local Ollama loopback, and returns a ``RouterResult``
+    qwen2.5-coder:3b via the local Ollama loopback, and returns a ``RouterResult``
     containing a ``TaskContract``.
 
     **This class does not generate text, code, or explanations.**
@@ -129,7 +129,7 @@ class ClassificationRouter:
     Parameters
     ----------
     gateway : ModelGatewayInterface
-        The model gateway used to call phi3:mini. Must be pre-configured
+        The model gateway used to call qwen2.5-coder:3b. Must be pre-configured
         with the correct model and loopback address.
     controller : VectorStoreInterface | None
         Optional ChromaDB controller for Stream D context injection.
@@ -155,7 +155,7 @@ class ClassificationRouter:
         )
 
     # ------------------------------------------------------------------
-    # Public API — classify() and is_available() ONLY
+    # Public API â€” classify() and is_available() ONLY
     # ------------------------------------------------------------------
 
     def classify(self, task_description: str) -> RouterResult:
@@ -165,7 +165,7 @@ class ClassificationRouter:
         This method:
           1. Validates the task description.
           2. Optionally fetches Stream D context for prompt grounding.
-          3. Builds a classification-only prompt for phi3:mini.
+          3. Builds a classification-only prompt for qwen2.5-coder:3b.
           4. Calls the gateway and parses the JSON response.
           5. Assembles a ``TaskContract`` from the department registry.
           6. Returns a ``RouterResult``.
@@ -186,7 +186,7 @@ class ClassificationRouter:
         t0 = time.monotonic()
 
         if not task_description or not task_description.strip():
-            logger.warning("ClassificationRouter.classify: empty task_description — using fallback.")
+            logger.warning("ClassificationRouter.classify: empty task_description â€” using fallback.")
             return self._fallback_result(
                 task_description="(empty)",
                 reason="Task description was empty or whitespace-only.",
@@ -202,14 +202,14 @@ class ClassificationRouter:
         # Step 2: Build classification prompt
         prompt = self._build_prompt(truncated, context_block)
 
-        # Step 3: Call phi3:mini
+        # Step 3: Call qwen2.5-coder:3b
         try:
             generation = self._gateway.generate(prompt)
             raw_text = generation.text
             model_name = generation.model
         except ModelGatewayError as exc:
             logger.warning(
-                "ClassificationRouter.classify: gateway error — %s. Using fallback.", exc
+                "ClassificationRouter.classify: gateway error â€” %s. Using fallback.", exc
             )
             latency_ms = int((time.monotonic() - t0) * 1000)
             return self._fallback_result(
@@ -234,7 +234,7 @@ class ClassificationRouter:
 
         latency_ms = int((time.monotonic() - t0) * 1000)
         logger.info(
-            "ClassificationRouter.classify: '%s' → '%s' (confidence=%s, fallback=%s, latency=%dms).",
+            "ClassificationRouter.classify: '%s' â†’ '%s' (confidence=%s, fallback=%s, latency=%dms).",
             truncated[:60], department.value, confidence, parse_fallback, latency_ms,
         )
 
@@ -261,7 +261,7 @@ class ClassificationRouter:
         return self._gateway.is_available()
 
     # ------------------------------------------------------------------
-    # Internal helpers — none of these generate content
+    # Internal helpers â€” none of these generate content
     # ------------------------------------------------------------------
 
     def _fetch_stream_d_context(self, task_description: str) -> str:
@@ -288,13 +288,13 @@ class ClassificationRouter:
                 return _CONTEXT_BLOCK_TEMPLATE.format(identity_text=identity_text)
         except Exception as exc:
             logger.debug(
-                "ClassificationRouter._fetch_stream_d_context: skipped — %s", exc
+                "ClassificationRouter._fetch_stream_d_context: skipped â€” %s", exc
             )
         return ""
 
     @staticmethod
     def _build_prompt(task_description: str, context_block: str) -> str:
-        """Build the classification-only prompt for phi3:mini."""
+        """Build the classification-only prompt for qwen2.5-coder:3b."""
         return _CLASSIFICATION_PROMPT_TEMPLATE.format(
             context_block=context_block,
             task_description=task_description,
@@ -318,7 +318,7 @@ class ClassificationRouter:
     @staticmethod
     def _parse_classification(raw_text: str) -> tuple[Department, str, bool]:
         """
-        Parse the phi3:mini response into (Department, confidence_hint, fallback_used).
+        Parse the qwen2.5-coder:3b response into (Department, confidence_hint, fallback_used).
 
         Extracts the first JSON object from the raw text (stripping any prose
         the model may have added despite the prompt constraint), then maps the
@@ -353,7 +353,7 @@ class ClassificationRouter:
             department = department_from_string(raw_dept)
         except ValueError:
             logger.debug(
-                "ClassificationRouter._parse_classification: unknown department '%s' — fallback.",
+                "ClassificationRouter._parse_classification: unknown department '%s' â€” fallback.",
                 raw_dept,
             )
             return FALLBACK_DEPARTMENT, "low", True

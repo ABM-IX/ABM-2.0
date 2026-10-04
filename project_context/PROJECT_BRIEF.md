@@ -21,10 +21,9 @@ picking one.
 finished), plus Client #1 (API layer + console) and a post-roadmap
 "Conversational & Task Execution Layer" (synthesis-grounded `ask`, the
 `run <task>` command, a dedicated `conversational` department). Phone ↔
-desktop encrypted sync verified working end-to-end with real data. Now
-starting **Phase v2.0, Increment 1: Service Interfaces** (see below) —
-the first, narrowly-scoped slice of the "System Kernel & Governance"
-backlog item, not the whole backlog at once.
+desktop encrypted sync verified working end-to-end with real data.
+Phase v2.0, Increment 1 (Service Interfaces) complete and gated.
+Phase v2.0, Increment 2 (Asynchronous Event Bus) complete and gated.
 
 **What this project is:** A local-first, privacy-isolated Cognitive OS acting as
 a digital twin of the developer (Arabang/ABM) and administrative overseer for
@@ -86,23 +85,22 @@ handling for identity/factual questions — extractive, not generative, for
 scoped to Streams C+D, and a `run <task>` command dispatching real work
 through the v0.3 classifier + v0.4 sandbox + confidence gate.
 
-**Phase v2.0, Increment 1 deliverables — Service Interfaces:**
-- `ServiceRegistry` (`abm/api/core/registry.py`) already handles boot/
-  shutdown lifecycle and centralizes service access correctly — do not
-  rebuild this, it works. What's missing: its properties are typed to
-  CONCRETE classes (`ChromaController`, `OllamaEmbeddingWrapper`,
-  `OllamaModelGateway`), not abstract interfaces — so swapping an
-  implementation (e.g. ChromaDB for another vector store, or Ollama for
-  another local model runner) would require touching every consumer.
-- Define abstract interfaces (e.g. `VectorStoreInterface`,
-  `EmbedderInterface`, `ModelGatewayInterface`) that the existing concrete
-  classes implement. Type `ServiceRegistry`'s properties against these
-  interfaces, not the concrete classes.
-- This is a structural refactor only — no behavior changes. Every existing
-  test must continue to pass unchanged; if a test currently imports a
-  concrete class directly where it should use the interface, update the
-  test's import, not its assertions.
-- Increment 1 does not advance to Increment 2 (which item from
-  `ARCHITECTURE_BACKLOG.md` comes next, if any, is a future decision — not
-  assumed now) until this passes its own test gate at 100% with zero
-  regressions across the full existing suite.
+**Phase v2.0, Increment 1 deliverables — Service Interfaces (Complete & Gated):**
+- `ServiceRegistry` (`abm/api/core/registry.py`) properties typed to
+  abstract interfaces (`VectorStoreInterface`, `EmbedderInterface`,
+  `ModelGatewayInterface`).
+- Tested with dedicated gate `tests/test_increment1_service_interfaces_gate.py`
+  (100% pass, swappability proved with in-memory stubs).
+
+**Phase v2.0, Increment 2 deliverables — Asynchronous Event Bus (Complete & Gated):**
+- Centralized decoupled publish/subscribe Event Bus subsystem (`EventBus`,
+  `EventBusInterface`, `Event`, `SystemTopic`) implemented in `abm/api/core/bus.py`
+  and `abm/api/core/interfaces.py`.
+- Features:
+  - Exact and wildcard topic matching (`*`, `code.*`, `system.*`).
+  - Priority-ordered subscriber execution.
+  - Strict error isolation per Constitution Rule 9 (faulty subscriber exceptions are caught, logged, and isolated without crashing the bus or sibling subscribers).
+  - Non-blocking asynchronous dispatch (`publish_async`) with thread-safe background queue worker and lifecycle management (`start`, `stop`, `drain`).
+  - Full integration into `ServiceRegistry` (`registry.event_bus`) with automatic `SYSTEM_BOOT` and `SYSTEM_SHUTDOWN` event broadcast.
+- Tested and verified with hard gate `tests/test_phase_v20_increment2_event_bus_gate.py`
+  (13/13 passed in ~4s with zero regressions).

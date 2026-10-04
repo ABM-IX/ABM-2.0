@@ -11,7 +11,6 @@ import 'package:http/http.dart' as http;
 
 import '../crypto/sync_crypto_channel.dart';
 import '../models/encrypted_sync_payload.dart';
-import '../models/sync_handshake.dart';
 
 
 const String kSyncHandshakeEndpoint = '/api/sync/handshake';

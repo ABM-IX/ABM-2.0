@@ -12,3 +12,13 @@ __pycache__/
 
 # Project-specific
 .sync_pairing.json
+.env
+
+# Crash & debug logs
+*.log
+
+# Dependencies and build outputs
+node_modules/
+**/node_modules/
+dist/
+**/dist/

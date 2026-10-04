@@ -132,6 +132,8 @@ class TestCollectionIsolationGate(unittest.TestCase):
 
     def setUp(self) -> None:
         self.controller = ChromaController(in_memory=True)
+        for name in ALL_COLLECTIONS:
+            self.controller.clear_collection(name)
         for collection_name, doc in GATE_DOCUMENTS.items():
             self.controller.add_document(
                 collection_name,

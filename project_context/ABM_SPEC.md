@@ -1,4 +1,4 @@
-**ABM 2.0: ABSOLUTE MASTER TECHNICAL SPECIFICATION**
+﻿**ABM 2.0: ABSOLUTE MASTER TECHNICAL SPECIFICATION**
 
 **System Nature: Local-First Personal Cognitive OS & Strategic Twin**
 
@@ -63,11 +63,11 @@ inter-collection bleed is blocked by process separation rules:
 
 \[ EXECUTIVE ORCHESTRATOR \]
 
-│
+â”‚
 
-┌───────────────┬──────┴────────┬───────────────┐
+â”Œâ”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”´â”€â”€â”€â”€â”€â”€â”€â”€â”¬â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”
 
-▼ ▼ ▼ ▼
+â–¼ â–¼ â–¼ â–¼
 
 Stream D Stream A Stream B Stream C
 
@@ -147,7 +147,7 @@ local models down the line without modifying core orchestration logic.
 Tasks are processed across specialized local model allocations via
 Ollama:
 
--   **Intent Routing & Classification Node:** Executed via phi3:mini (or
+-   **Intent Routing & Classification Node:** Executed via qwen2.5-coder:3b (or
     ultra-lightweight SLM equivalents) to perform lightning-fast input
     tagging, routing, and classification passes.
 
@@ -170,25 +170,25 @@ programmatically banned from generating any raw code or text
 explanations directly. Instead, it enforces a strict operational
 processing loop powered by immutable **Task Contracts**:
 
-\[Input Received\] ──\> \[phi3 Classifies\] ──\> \[Generate Task
+\[Input Received\] â”€â”€\> \[phi3 Classifies\] â”€â”€\> \[Generate Task
 Contract\]
 
-│
+â”‚
 
-▼
+â–¼
 
-\[Execute in Sandbox\] \<── \[Verify Permissions\] \<── \[Retrieve
+\[Execute in Sandbox\] \<â”€â”€ \[Verify Permissions\] \<â”€â”€ \[Retrieve
 Vectors\]
 
-│
+â”‚
 
-▼
+â–¼
 
-\[Multi-Factor Gate\] ──\> \[Passed\] ──\> \[Commit / Output\]
+\[Multi-Factor Gate\] â”€â”€\> \[Passed\] â”€â”€\> \[Commit / Output\]
 
-│
+â”‚
 
-└──\> \[Failed\] ──\> \[Quarantine Queue\]
+â””â”€â”€\> \[Failed\] â”€â”€\> \[Quarantine Queue\]
 
 **The Task Contract Format**
 
@@ -374,7 +374,7 @@ initializing the next:
     cross-node synchronization channel, and deploy ambient interaction
     managers
 
-**🔧 THE HARDWARE-AGNOSTIC BLUEPRINT CORRECTIONS**
+**ðŸ”§ THE HARDWARE-AGNOSTIC BLUEPRINT CORRECTIONS**
 
 -   **Section 2: Mobile Twin Node Architecture (Updated)**
 

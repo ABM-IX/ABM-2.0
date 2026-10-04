@@ -39,6 +39,7 @@ from typing import Any
 
 import threading
 import re
+import difflib
 from abm.memory.chroma_controller import ALL_COLLECTIONS
 from abm.orchestrator.departments import DEPARTMENT_REGISTRY
 from abm.strategic_wing.strategic_asset_analyzer import StrategicAnalysisResult
@@ -49,10 +50,56 @@ from abm.sandbox.execution_loop import SandboxCheckLoop
 from abm.sandbox.models import ValidationScores
 from abm.sandbox.validation_gate import MultiFactorGate
 from abm.orchestrator.task_contract import TaskContract
+from abm.strategic_wing.decision_journal import DecisionJournal
 
 from .core.registry import ServiceRegistry
 
 logger = logging.getLogger(__name__)
+
+
+# ---------------------------------------------------------------------------
+# Fast-path constants — Feature 2 (conversational pre-check)
+# ---------------------------------------------------------------------------
+
+#: Plain conversational patterns matched before any classify/embed/LLM call.
+#: Zero tokens — pure regex. Order matters: first match wins.
+_CONVERSATIONAL_PATTERNS: list[re.Pattern] = [
+    # Greetings & informal openers
+    re.compile(
+        r'^\s*(yoh?|hi+|hello+|hey+|howdy|good\s+(morning|afternoon|evening|night)|'  # noqa: E501
+        r'sup|what\'?s\s+up|yo+|greetings)'
+        r'(\s+(bro|man|dude|abm|there|guys?))?'
+        r'(\s+(what\'?s\s+up|how\s+are\s+you|how\s+it\s+going|sup))?[\.!?\s]*$',
+        re.IGNORECASE,
+    ),
+    # Common questions about capabilities / wellbeing
+    re.compile(
+        r'^\s*(what\s+can\s+you\s+do(\s+for\s+me)?|how\s+can\s+you\s+help(\s+me)?|'  # noqa: E501
+        r'what\s+are\s+your\s+capabilities|how\s+are\s+you(\s+doing)?)[\.!?\s]*$',
+        re.IGNORECASE,
+    ),
+    # Positive acknowledgements
+    re.compile(
+        r'^\s*(ok(ay)?|got\s+it|thanks?(\.?)|thank\s+you|sure|cool|great|'  # noqa: E501
+        r'perfect|alright|sounds\s+good|noted|understood|nice|awesome|'  # noqa: E501
+        r'excellent|wonderful|cheers)[\.!?\s]*$',
+        re.IGNORECASE,
+    ),
+    # Farewells
+    re.compile(
+        r'^\s*(bye(\s*bye)?|goodbye|see\s+(you|ya)|cya|later|'  # noqa: E501
+        r'take\s+care|have\s+a\s+good\s+one|good\s+night)[\.!?\s]*$',
+        re.IGNORECASE,
+    ),
+]
+
+#: Canned responses paired 1:1 with _CONVERSATIONAL_PATTERNS.
+_CONVERSATIONAL_RESPONSES: list[str] = [
+    "Hey! I'm ABM 2.0 — ready to help. What are you working on?",
+    "I am ABM 2.0, your personal cognitive layer and digital twin. I can help launch desktop applications, manage project memory, run automated workflows, answer queries, and supervise your strategic tasks.",
+    "Got it! Let me know if there's anything you need.",
+    "Take care! I'll be here when you need me.",
+]
 
 
 # ============================================================================
@@ -202,6 +249,27 @@ class RunTaskResult:
     degraded: bool = False
 
 
+@dataclass
+class IngestResult:
+    """
+    Return type for ``ingestDocument``.
+    """
+    path: str
+    results: list[dict[str, Any]] = field(default_factory=list)
+    degraded: bool = False
+
+
+@dataclass
+class ReviewProjectResult:
+    """
+    Return type for ``reviewProject``.
+    """
+    project_name: str
+    hits: list[dict[str, Any]] = field(default_factory=list)
+    synthesis: str = ""
+    degraded: bool = False
+
+
 # ============================================================================
 # Internal helpers
 # ============================================================================
@@ -253,6 +321,7 @@ def answerQuestion(
     *,
     registry: ServiceRegistry,
     n_results: int | None = None,
+    history: list[dict[str, str]] | None = None,
 ) -> AnswerResult:
     """
     Route a natural-language question through the classification engine and
@@ -298,7 +367,95 @@ def answerQuestion(
             degraded=False,
         )
 
+    # -------------------------------------------------------------------------
+    # Feature 5 — Tier-1 deterministic app launcher (zero tokens)
+    # -------------------------------------------------------------------------
+    try:
+        from abm.automation.direct_app_map import match_tier1_intent, resolve_command
+        from abm.automation.launcher_map import DynamicLauncher
+        import subprocess
 
+        tier1 = match_tier1_intent(question)
+        if tier1 is not None:
+            action, app_name = tier1
+            launch_cmd = resolve_command(app_name)
+            if launch_cmd:
+                if action == "open":
+                    result = DynamicLauncher().launch(launch_cmd)
+                    if result.success:
+                        msg = f"\u2705 Launched {app_name} (PID {result.pid})."
+                    else:
+                        msg = f"\u274c Could not launch {app_name}: {result.error}"
+                else:  # close
+                    import psutil as _psutil
+                    killed = []
+                    for proc in _psutil.process_iter(["name", "pid"]):
+                        if launch_cmd.lower() in proc.info["name"].lower():
+                            try:
+                                proc.kill()
+                                killed.append(str(proc.info["pid"]))
+                            except Exception:
+                                pass
+                    if killed:
+                        msg = f"\u2705 Closed {app_name} (PID(s): {', '.join(killed)})."
+                    else:
+                        msg = f"\u26a0\ufe0f {app_name} does not appear to be running."
+                return AnswerResult(
+                    question=question,
+                    department="tier1_action",
+                    confidence="high",
+                    synthesis=msg,
+                    fallback_used=False,
+                    degraded=False,
+                )
+    except Exception as _t1_exc:
+        logger.debug("answerQuestion: Tier-1 intent check failed — %s", _t1_exc)
+
+    # -------------------------------------------------------------------------
+    # Feature 5b — Window actions (minimize / maximize / restore window)
+    # -------------------------------------------------------------------------
+    _w_match = re.search(
+        r'^\s*(minimize|maximize|restore|hide)\s*(window|app|ui)?\s*$',
+        question,
+        re.IGNORECASE,
+    )
+    if _w_match:
+        _w_act = _w_match.group(1).lower()
+        try:
+            import ctypes
+            _user32 = ctypes.windll.user32
+            _hwnd = _user32.GetForegroundWindow()
+            if _w_act in ("minimize", "hide"):
+                _user32.ShowWindow(_hwnd, 6)  # SW_MINIMIZE
+                _w_msg = "✅ Minimized active window."
+            else:
+                _user32.ShowWindow(_hwnd, 9)  # SW_RESTORE / SW_MAXIMIZE
+                _w_msg = "✅ Restored active window."
+            return AnswerResult(
+                question=question,
+                department="window_action",
+                confidence="high",
+                synthesis=_w_msg,
+                fallback_used=False,
+                degraded=False,
+            )
+        except Exception as _w_exc:
+            logger.warning("answerQuestion: window action failed — %s", _w_exc)
+
+    # -------------------------------------------------------------------------
+    # Feature 2 — Fast conversational pre-check (zero tokens)
+    # -------------------------------------------------------------------------
+    q_stripped = question.strip()
+    for _i, _pat in enumerate(_CONVERSATIONAL_PATTERNS):
+        if _pat.match(q_stripped):
+            return AnswerResult(
+                question=question,
+                department="conversational",
+                confidence="high",
+                synthesis=_CONVERSATIONAL_RESPONSES[_i],
+                fallback_used=False,
+                degraded=False,
+            )
 
     n = n_results if n_results is not None else registry.config.n_retrieval_results
 
@@ -318,70 +475,120 @@ def answerQuestion(
     synthesis = ""
     
     q_lower = question.lower().strip()
-    is_identity_query = (
-        "what is abm" in q_lower or
-        "who are you" in q_lower or
-        "what does abm stand for" in q_lower or
-        "what does abm mean" in q_lower
-    )
+    is_identity_query = bool(re.search(
+        r'\b(who|what|where)\b.*\b(are you|is abm|did you come from|made you|built you|developed you|created you|programmed you)\b|'
+        r'\bwho\b.*\b(developed|made|built|created|programmed)\b.*\b(you|abm)\b|'
+        r'\bwhat\b.*\babm\b.*\b(stand for|mean|is)\b|'
+        r'\bare\s+you\s+abm\b|'
+        r'\byou(\'re| are)?\s+(not\s+)?abm\b',
+        q_lower
+    ))
 
     try:
-        embedding = registry.embedder.embed(question)
-        for collection_name in allowed_streams:
-            hits.extend(
-                _flatten_query_hits(registry, collection_name, embedding, n)
-            )
-        # Sort by distance (ascending)
-        hits.sort(key=lambda h: float("inf") if h["distance"] is None else h["distance"])
-
         if is_identity_query:
-            # Identity extraction: bypass LLM completely, use fixed template from source fields
+            # Identity extraction: bypass LLM and embedder completely
             synthesis = (
                 "Extracted from Identity Document: 'ABM' is Arabang's own initials, "
                 "not a technical acronym, and must never be expanded into an invented backronym. "
                 "I act as a persistent personal cognitive layer and digital twin, designed to amplify "
                 "engineering execution and serve as the strategic supervisor for FirstMinds."
             )
-        elif department_str == "conversational":
-            # Cap hits to the top 2 to reduce generation time and avoid timeouts
-            context_texts = [f"- {h.get('text', '')}" for h in hits[:2] if h.get("text")]
-            prompt = (
-                "You are ABM 2.0, my persistent personal cognitive layer and digital twin. "
-                "Answer the following conversational question warmly, directly, and in the first person. "
-                "Use plain sentences and avoid corporate jargon. Keep it short.\n"
-                "CRITICAL ANTI-HALLUCINATION RULE: If the user asks for a specific fact (e.g. what an acronym stands for, a name, a date) and the answer is NOT explicitly stated in the context, you MUST say 'I don't have that specific information' and ask for clarification. You are STRICTLY FORBIDDEN from inventing expansions for acronyms or adding outside knowledge.\n"
-                "You may use the following recent history and identity context to inform your answer, "
-                "but you are NOT strictly required to say 'I cannot answer this' if the context "
-                "doesn't explicitly contain the answer to a general conversational query.\n\n"
-                "Context:\n"
-                f"{chr(10).join(context_texts)}\n\n"
-                f"Question: {question}"
-            )
-            try:
-                response = registry.gateway.generate(prompt)
-                synthesis = response.text
-            except Exception as exc:
-                logger.warning("answerQuestion: conversational synthesis failed — %s", exc)
-                synthesis = "Hello! I am ABM 2.0, your personal cognitive layer."
         else:
-            if hits:
-                # Construct the strict synthesis prompt
-                context_texts = [f"- {h.get('text', '')}" for h in hits if h.get("text")]
+            # Step 3a: Attempt vector retrieval (soft fail if Ollama embedder is offline)
+            try:
+                embedding = registry.embedder.embed(question)
+                for collection_name in allowed_streams:
+                    hits.extend(
+                        _flatten_query_hits(registry, collection_name, embedding, n)
+                    )
+                hits.sort(key=lambda h: float("inf") if h["distance"] is None else h["distance"])
+                hits = hits[:5]  # Cap to top-5 by relevance — keeps prompts lean
+            except Exception as _embed_exc:
+                logger.warning(
+                    "answerQuestion: vector memory retrieval skipped (%s) — proceeding.",
+                    _embed_exc,
+                )
+                degraded = True
+                hits = []
+
+            if department_str == "conversational":
+                # Cap hits to the top 2 to reduce generation time and avoid timeouts
+                context_texts = [f"- {h.get('text', '')}" for h in hits[:2] if h.get("text")]
+                
+                history_text = ""
+                if history:
+                    history_str = "\n".join([f"{msg.get('role', 'unknown').capitalize()}: {msg.get('content', '')}" for msg in history])
+                    history_text = f"Recent Conversation History:\n{history_str}\n\n"
+                
                 prompt = (
-                    "You are ABM 2.0. Answer the user's question directly, in the first person, and with a warm, natural tone. "
-                    "Use plain language without corporate jargon.\n"
+                    "You are ABM 2.0, my persistent personal cognitive layer and digital twin. "
+                    "Answer the following conversational question warmly, directly, and in the first person. "
+                    "Use plain sentences and avoid corporate jargon. Keep it short.\n"
                     "CRITICAL ANTI-HALLUCINATION RULE: If the user asks for a specific fact (e.g. what an acronym stands for, a name, a date) and the answer is NOT explicitly stated in the context, you MUST say 'I don't have that specific information' and ask for clarification. You are STRICTLY FORBIDDEN from inventing expansions for acronyms or adding outside knowledge.\n"
-                    "You must answer using ONLY the facts explicitly present in the provided context. Never fill a factual gap with a plausible-sounding invention.\n"
-                    "If the context does not contain the answer, say 'I cannot answer this based on the provided context.'\n\n"
+                    "You may use the following recent history and identity context to inform your answer, "
+                    "but you are NOT strictly required to say 'I cannot answer this' if the context "
+                    "doesn't explicitly contain the answer to a general conversational query.\n\n"
+                    f"{history_text}"
                     "Context:\n"
                     f"{chr(10).join(context_texts)}\n\n"
                     f"Question: {question}"
                 )
-                response = registry.gateway.generate(prompt)
-                synthesis = response.text
+                try:
+                    response = registry.gateway.generate(prompt, max_tokens=180)
+                    synthesis = response.text
+                except Exception as exc:
+                    logger.warning("answerQuestion: conversational synthesis failed — %s", exc)
+                    synthesis = "Hello! I am ABM 2.0, your personal cognitive layer."
+            else:
+                if hits:
+                    has_governance = False
+                    has_client = False
+                    gov_filenames = {"ABM_SPEC", "ARCHITECTURAL_CONSTITUTION", "MISSION_VISION_PHILOSOPHY", "PROJECT_BRIEF"}
+                    
+                    for h in hits:
+                        doc_id = h.get("id", "")
+                        text = h.get("text", "")
+                        is_gov = any(g in doc_id or g in text for g in gov_filenames)
+                        if is_gov:
+                            has_governance = True
+                        elif text:
+                            has_client = True
+                    
+                    isolation_rule = ""
+                    if has_governance and has_client:
+                        isolation_rule = (
+                            "PROJECT ISOLATION RULE: You are advising on a client project, but your context includes ABM's own governance documents. "
+                            "You must NEVER propose editing, updating, or referencing ABM's own governance documents (like ABM_SPEC.md or ARCHITECTURAL_CONSTITUTION.md) "
+                            "as part of advice about the client's software. They are strictly read-only context describing you (ABM), not the client.\n"
+                        )
+
+                    context_texts = [f"- {h.get('text', '')}" for h in hits if h.get("text")]
+                    history_text = ""
+                    if history:
+                        history_str = "\n".join([f"{msg.get('role', 'unknown').capitalize()}: {msg.get('content', '')}" for msg in history])
+                        history_text = f"Recent Conversation History:\n{history_str}\n\n"
+
+                    prompt = (
+                        "You are ABM 2.0. Answer the user's question directly, in the first person, and with a warm, natural tone using plain conversational prose. "
+                        "Keep your response to short paragraphs (2-4 sentences max). Do not format your response as a numbered report or bulleted list (e.g., avoid 'Here are some key points... 1... 2... 3...'). Answer smoothly in flowing paragraphs.\n"
+                        "CRITICAL ANTI-HALLUCINATION RULE: If the user asks for a specific fact (e.g. what an acronym stands for, a name, a date) and the answer is NOT explicitly stated in the context, you MUST say 'I don't have that specific information' and ask for clarification. You are STRICTLY FORBIDDEN from inventing expansions for acronyms or adding outside knowledge.\n"
+                        "You must answer using ONLY the facts explicitly present in the provided context. Never fill a factual gap with a plausible-sounding invention.\n"
+                        "If the context does not contain the answer, say 'I cannot answer this based on the provided context.'\n\n"
+                        f"{isolation_rule}"
+                        f"{history_text}"
+                        "Context:\n"
+                        f"{chr(10).join(context_texts)}\n\n"
+                        f"Question: {question}"
+                    )
+                    response = registry.gateway.generate(prompt, max_tokens=180)
+                    synthesis = response.text
+                else:
+                    synthesis = ""
     except Exception as exc:
-        logger.warning("answerQuestion: retrieval or synthesis failed — %s", exc)
+        logger.warning("answerQuestion: synthesis failed — %s", exc)
         degraded = True
+        if not synthesis:
+            synthesis = "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable."
 
     # Stream C feedback loop intentionally removed to prevent hallucination cycles.
 
@@ -403,48 +610,76 @@ def _worker_thread(contract: TaskContract, registry: ServiceRegistry, objective:
     and scores it using MultiFactorGate.
     """
     try:
-        # Prompt gateway to generate python code
-        prompt = (
+        journal = DecisionJournal(registry.controller, registry.embedder)
+        sandbox_loop = SandboxCheckLoop(sandbox_factory=DockerSandbox)
+        gate = MultiFactorGate()
+        
+        base_prompt = (
             f"You are a backend worker. Write a Python script to achieve the following objective:\n"
             f"Objective: {objective}\n\n"
             "Return ONLY the raw python code inside a ```python ``` block. Do not include any explanations."
         )
-        response = registry.gateway.generate(prompt)
-        
-        # Extract python code
-        code = ""
-        match = re.search(r"```python\n(.*?)\n```", response.text, re.DOTALL)
-        if match:
-            code = match.group(1).strip()
-        else:
-            # Fallback if markdown block is missing
-            code = response.text.replace("```", "").strip()
+        prompt = base_prompt
 
-        registry.monitor.mark_in_sandbox(contract.contract_id)
-        
-        # Evaluate code in sandbox
-        sandbox_loop = SandboxCheckLoop(sandbox_factory=DockerSandbox)
-        exec_result = sandbox_loop.evaluate_code(
-            code_files={"/tmp/main.py": code}, 
-            test_command=["python", "/tmp/main.py"]
-        )
-        
-        registry.monitor.record_execution(contract.contract_id, exec_result)
+        for attempt in range(1, 4):
+            # Prompt gateway to generate python code
+            response = registry.gateway.generate(prompt)
+            
+            # Extract python code
+            code = ""
+            match = re.search(r"```python\n(.*?)\n```", response.text, re.DOTALL)
+            if match:
+                code = match.group(1).strip()
+            else:
+                # Fallback if markdown block is missing
+                code = response.text.replace("```", "").strip()
 
-        # Create validation scores
-        test_succ = 1.0 if exec_result.exit_code == 0 else 0.0
-        scores = ValidationScores(
-            m_align=0.9,
-            t_correct=0.9,
-            s_val=0.9,
-            test_succ=test_succ,
-            p_align=0.9,
-        )
+            registry.monitor.mark_in_sandbox(contract.contract_id)
+            
+            # Evaluate code in sandbox
+            exec_result = sandbox_loop.evaluate_code(
+                code_files={"/tmp/main.py": code}, 
+                test_command=["python", "/tmp/main.py"]
+            )
+            
+            registry.monitor.record_execution(contract.contract_id, exec_result)
+            
+            # Create validation scores
+            test_succ = 1.0 if exec_result.exit_code == 0 else 0.0
+            scores = ValidationScores(
+                m_align=0.9,
+                t_correct=0.9,
+                s_val=0.9,
+                test_succ=test_succ,
+                p_align=0.9,
+            )
 
-        # Evaluate through confidence gate
-        gate = MultiFactorGate()
-        gate_result = gate.evaluate(contract, scores, code)
-        registry.monitor.record_gate_result(contract.contract_id, gate_result, scores)
+            is_final_attempt = (attempt == 3)
+            
+            if test_succ == 1.0 or is_final_attempt:
+                # Evaluate through confidence gate (this will quarantine if it fails)
+                gate_result = gate.evaluate(contract, scores, code)
+                registry.monitor.record_gate_result(contract.contract_id, gate_result, scores)
+                
+                journal.log_decision(
+                    what_decided=f"Sandbox Execution Attempt {attempt} for {contract.contract_id}",
+                    why_decided=f"Exit code: {exec_result.exit_code}. Gate passed: {gate_result.passed}."
+                )
+                break
+            else:
+                # Execution failed and not final attempt, prepare next retry
+                journal.log_decision(
+                    what_decided=f"Sandbox Execution Attempt {attempt} for {contract.contract_id}",
+                    why_decided=f"Exit code: {exec_result.exit_code}. Retrying."
+                )
+                
+                error_msg = exec_result.stderr if exec_result.stderr else exec_result.stdout
+                prompt = (
+                    f"{base_prompt}\n\n"
+                    f"Your previous attempt failed with exit code {exec_result.exit_code}.\n"
+                    f"Error output:\n{error_msg}\n\n"
+                    f"Please fix the code and try again."
+                )
 
     except Exception as exc:
         logger.error("runTask worker thread failed: %s", exc)
@@ -706,6 +941,83 @@ def aggregateProjectMemory(
     )
 
 
+def reviewProject(
+    project_name: str,
+    *,
+    registry: ServiceRegistry,
+    n_results: int = 10,
+) -> ReviewProjectResult:
+    """
+    Retrieve a project's Stream A entries (code topologies) and synthesize actionable 
+    improvement suggestions strictly grounded in the ingested code.
+
+    STATUS       : stable
+    OWNER        : abm.memory.chroma_controller.ChromaController (retrieval) / abm.gateway (synthesis)
+    DEPENDENCIES : ServiceRegistry.embedder, ServiceRegistry.controller, ServiceRegistry.gateway
+    CONSUMERS    : console ``review`` command
+
+    Parameters
+    ----------
+    project_name : str
+        Project name used as the retrieval query.
+    registry : ServiceRegistry
+        Booted service registry.
+    n_results : int
+        Number of code chunks to retrieve.
+
+    Returns
+    -------
+    ReviewProjectResult
+    """
+    if not project_name or not project_name.strip():
+        return ReviewProjectResult(project_name=project_name, degraded=False)
+
+    hits: list[dict[str, Any]] = []
+    degraded = False
+    synthesis = ""
+
+    try:
+        embedding = registry.embedder.embed(project_name)
+        # 1. Retrieve purely from Stream A (Code Topologies)
+        hits = _flatten_query_hits(registry, "abm_code_topologies", embedding, n_results)
+        
+        # Sort by distance
+        hits.sort(key=lambda h: float("inf") if h["distance"] is None else h["distance"])
+
+        if hits:
+            context_texts = [f"--- File/Snippet: {h.get('id', 'unknown')} ---\n{h.get('text', '')}" for h in hits if h.get("text")]
+            
+            # 2. Strict prompt composing existing capabilities
+            prompt = (
+                "You are an expert software reviewer. Review the following code snippets from the project.\n"
+                "Provide actionable improvement suggestions focusing on:\n"
+                "1. Architectural concerns\n"
+                "2. Style inconsistencies\n"
+                "3. Potential bugs\n\n"
+                "CRITICAL ANTI-HALLUCINATION RULE: You must base your suggestions PURELY on the provided snippets. "
+                "Do NOT invent files, variables, or functions that are not explicitly present in the context below.\n"
+                "If the provided snippets are too short or lack issues, state that the code looks fine based on the limited context.\n\n"
+                "Context Snippets:\n"
+                f"{chr(10).join(context_texts)}\n\n"
+                "Review:\n"
+            )
+            response = registry.gateway.generate(prompt)
+            synthesis = response.text
+        else:
+            synthesis = "No code topology data found for this project in Stream A."
+
+    except Exception as exc:
+        logger.warning("reviewProject: failed — %s", exc)
+        degraded = True
+
+    return ReviewProjectResult(
+        project_name=project_name,
+        hits=hits,
+        synthesis=synthesis,
+        degraded=degraded
+    )
+
+
 def explainAuditRecord(
     target: str,
     *,
@@ -758,7 +1070,6 @@ def explainAuditRecord(
             found=False,
             notes="No target specified.",
         )
-
     records: list[dict[str, Any]] = []
 
     # ── Source A: WorkflowMonitor (in-memory task records) ───────────────────
@@ -924,6 +1235,146 @@ def ingestAmbientEvent(
         )
 
 
+def ingestDocument(path: str, *, registry: ServiceRegistry) -> IngestResult:
+    """
+    Manually ingest a document (code, txt, md, pdf) from the filesystem into ABM streams.
+
+    STATUS       : stable
+    OWNER        : abm.companion.ingestion_coordinator
+    DEPENDENCIES : controller, embedder
+    CONSUMERS    : Console (cmd_ingest)
+    """
+    from abm.companion.ingestion_coordinator import IngestionCoordinator
+    logger.debug("ingestDocument: path=%r", path)
+    degraded = False
+    results = []
+    
+    try:
+        coordinator = IngestionCoordinator(
+            controller=registry.controller,
+            embedder=registry.embedder,
+            git_pipeline=None,
+        )
+        ingestions = coordinator.ingest_document(path)
+        for r in ingestions:
+            results.append({
+                "status": r.status,
+                "collection": r.collection,
+                "doc_ids": r.doc_ids,
+                "reason": r.reason
+            })
+    except Exception as exc:
+        logger.warning("ingestDocument failed: %s", exc)
+        degraded = True
+
+    return IngestResult(path=path, results=results, degraded=degraded)
+
+
+@dataclass
+class EditProposalResult:
+    target_file: str
+    diff: str
+    new_content: str
+    verified: bool
+    degraded: bool = False
+
+
+def proposeEdit(target_file: str, instruction: str, *, registry: ServiceRegistry) -> EditProposalResult:
+    """
+    Proposes an edit to a target file and verifies it in the sandbox.
+    
+    STATUS       : stable
+    OWNER        : abm.gateway
+    DEPENDENCIES : ServiceRegistry.gateway
+    CONSUMERS    : Web UI (handle_edit_propose)
+    """
+    try:
+        with open(target_file, "r", encoding="utf-8") as f:
+            old_content = f.read()
+            
+        journal = DecisionJournal(registry.controller, registry.embedder)
+        sandbox_loop = SandboxCheckLoop(sandbox_factory=DockerSandbox)
+        
+        base_prompt = (
+            f"You are a backend worker. Edit the following file according to this instruction:\n"
+            f"Instruction: {instruction}\n\n"
+            f"File: {target_file}\n"
+            f"Current Content:\n```python\n{old_content}\n```\n\n"
+            "Return ONLY the fully edited raw file content inside a ```python ``` block. Do not include any explanations. "
+            "Output the ENTIRE file, not just the changed lines."
+        )
+        prompt = base_prompt
+        
+        for attempt in range(1, 4):
+            response = registry.gateway.generate(prompt)
+            
+            new_content = ""
+            match = re.search(r"```python\n(.*?)\n```", response.text, re.DOTALL)
+            if match:
+                new_content = match.group(1).strip()
+            else:
+                new_content = response.text.replace("```", "").strip()
+
+            sandbox_file_path = f"/tmp/{os.path.basename(target_file)}"
+            
+            exec_result = sandbox_loop.evaluate_code(
+                code_files={sandbox_file_path: new_content}, 
+                test_command=["python", "-m", "py_compile", sandbox_file_path]
+            )
+            
+            is_final_attempt = (attempt == 3)
+            
+            if exec_result.exit_code == 0 or is_final_attempt:
+                journal.log_decision(
+                    what_decided=f"proposeEdit attempt {attempt} for {target_file}",
+                    why_decided=f"Exit code: {exec_result.exit_code}. Passed: {exec_result.exit_code == 0}"
+                )
+                
+                diff_lines = list(difflib.unified_diff(
+                    old_content.splitlines(keepends=True),
+                    new_content.splitlines(keepends=True),
+                    fromfile=f"a/{os.path.basename(target_file)}",
+                    tofile=f"b/{os.path.basename(target_file)}",
+                    n=3
+                ))
+                diff_text = "".join(diff_lines)
+                
+                return EditProposalResult(
+                    target_file=target_file,
+                    diff=diff_text,
+                    new_content=new_content,
+                    verified=(exec_result.exit_code == 0),
+                    degraded=False
+                )
+            else:
+                journal.log_decision(
+                    what_decided=f"proposeEdit attempt {attempt} for {target_file}",
+                    why_decided=f"Exit code: {exec_result.exit_code}. Retrying."
+                )
+                
+                error_msg = exec_result.stderr if exec_result.stderr else exec_result.stdout
+                prompt = (
+                    f"{base_prompt}\n\n"
+                    f"Your previous attempt failed syntax validation with exit code {exec_result.exit_code}.\n"
+                    f"Error output:\n{error_msg}\n\n"
+                    f"Please fix the code and try again."
+                )
+    except Exception as exc:
+        logger.error("proposeEdit failed: %s", exc)
+        return EditProposalResult(target_file, "", "", False, True)
+
+def applyEdit(target_file: str, new_content: str, *, registry: ServiceRegistry) -> None:
+    """
+    Applies a previously proposed edit to a file.
+    
+    STATUS       : stable
+    OWNER        : abm.gateway
+    DEPENDENCIES : None
+    CONSUMERS    : Web UI (handle_edit_apply)
+    """
+    with open(target_file, "w", encoding="utf-8") as f:
+        f.write(new_content)
+
 # ============================================================================
 # ── FUTURE CAPABILITIES ──────────────────────────────────────────────────────
 # Documented stubs only. No backend exists. See ARCHITECTURE_BACKLOG.md.
@@ -1016,6 +1467,8 @@ __all__ = [
     "MemoryResult",
     "ExplainResult",
     "AmbientIngestionResult",
+    "IngestResult",
+    "ReviewProjectResult",
     # Stable capabilities
     "answerQuestion",
     "retrieveKnowledge",
@@ -1024,6 +1477,8 @@ __all__ = [
     "aggregateProjectMemory",
     "explainAuditRecord",
     "ingestAmbientEvent",
+    "ingestDocument",
+    "reviewProject",
     # Future capabilities (stubs)
     "continueTask",
     "reflectOnWork",

@@ -1,7 +1,7 @@
 """
 abm/api/core/config.py
 ======================
-APIConfig — configuration dataclass for the ABM API layer.
+APIConfig â€” configuration dataclass for the ABM API layer.
 
 All runtime parameters the API layer and ServiceRegistry need are declared
 here. Centralising them in a single dataclass makes the boot sequence
@@ -9,9 +9,9 @@ explicit and every value discoverable without grepping module internals.
 
 Design contract:
   - APIConfig is a plain dataclass with no side effects.
-  - All path defaults mirror the existing v0.1–v0.5 module constants so
+  - All path defaults mirror the existing v0.1â€“v0.5 module constants so
     the system works out-of-the-box from the repo root without extra config.
-  - Never import from non-standard library here — this module has zero deps
+  - Never import from non-standard library here â€” this module has zero deps
     on the rest of the abm package so it can be imported at the very top of
     the boot sequence.
 """
@@ -41,7 +41,7 @@ class APIConfig:
         Ollama model used for embeddings. Must match the v0.1 constant.
     classification_model : str
         Ollama model used for task classification. Must match the v0.3
-        OllamaModelGateway default (phi3:mini).
+        OllamaModelGateway default (qwen2.5-coder:3b).
     quarantine_dir : str
         Path to the v0.4 ambiguity quarantine directory.
     connect_timeout : float
@@ -59,7 +59,7 @@ class APIConfig:
     # --- Ollama (local-only, per constitution rule 1) ---
     ollama_base_url: str = "http://127.0.0.1:11434"
     embedding_model: str = "nomic-embed-text"
-    classification_model: str = "phi3:mini"
+    classification_model: str = "qwen2.5-coder:3b"
 
     # --- Governance ---
     quarantine_dir: str = "memory/ambiguity_quarantine"
@@ -70,6 +70,12 @@ class APIConfig:
 
     # --- Retrieval ---
     n_retrieval_results: int = 5
+
+    # --- Model Gateway (constitution rule 1: Ollama is always default/fallback) ---
+    # Set model_gateway_provider = "groq" to enable GroqModelGateway.
+    # GROQ_API_KEY env var must be set when using groq.
+    model_gateway_provider: str = "ollama"
+    groq_model: str = "llama-3.1-8b-instant"
 
 
 __all__ = ["APIConfig"]

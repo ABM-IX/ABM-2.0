@@ -6,6 +6,9 @@ Single entry point that starts all ABM background threads inside one process:
 2. Mobile Sync Server
 3. Retention Housekeeper periodic loop
 
+Groq is the sole reasoning provider. Ollama is not started, pre-warmed, or
+managed by this launcher. Set GROQ_API_KEY in the environment before running.
+
 Handles clean shutdown on SIGINT/SIGTERM to prevent orphaned threads or file locks.
 """
 import json
@@ -17,13 +20,61 @@ import sys
 import threading
 import time
 import urllib.request
+import psutil
+from dotenv import load_dotenv
+
+# ---------------------------------------------------------------------------
+# RAM guard — called before any explicit model load
+# ---------------------------------------------------------------------------
+
+MIN_RAM_MB_FOR_LOAD: float = 2048.0  # Minimum free RAM (MB) to attempt model load
+
+
+def check_available_ram_before_load(model_name: str) -> bool:
+    """
+    Check whether there is sufficient free RAM to safely load ``model_name``.
+
+    Uses psutil to read the system's available (not just free) memory.
+    Returns True if enough RAM is available, False and logs a warning if not.
+    Caller should skip the load if this returns False.
+
+    Parameters
+    ----------
+    model_name : str
+        The model we are about to load — used only for log context.
+    """
+    try:
+        mem = psutil.virtual_memory()
+        available_mb = mem.available / (1024 * 1024)
+        if available_mb < MIN_RAM_MB_FOR_LOAD:
+            logger.warning(
+                "[ABM Launcher] check_available_ram_before_load: only %.0f MB available "
+                "(minimum: %.0f MB). Skipping explicit load of '%s' to avoid OOM.",
+                available_mb, MIN_RAM_MB_FOR_LOAD, model_name,
+            )
+            return False
+        logger.info(
+            "[ABM Launcher] check_available_ram_before_load: %.0f MB available — OK to load '%s'.",
+            available_mb, model_name,
+        )
+        return True
+    except Exception as exc:
+        logger.warning(
+            "[ABM Launcher] check_available_ram_before_load: psutil error (%s) — proceeding with load.",
+            exc,
+        )
+        return True  # Fail open: if we can't check, don't block the boot
 from http.server import HTTPServer
 from pathlib import Path
 from typing import Any
 
+from abm.api.core.config import APIConfig
 from abm.api.core.registry import ServiceRegistry
 from abm.companion.watch_daemon import build_coordinator, _make_on_code_change, _make_on_telemetry_event
 from abm.companion.file_watcher import WorkspaceFileWatcher
+
+import abm.clients.web.main as web_main
+from abm.clients.web.main import ThreadingHTTPServer, ABMWebAPIHandler
 from abm.mobile.sync_server import SyncServerHandler, CONFIG_FILE as SYNC_CONFIG_FILE
 
 logger = logging.getLogger(__name__)
@@ -35,51 +86,25 @@ class ABMLauncher:
         self.sync_port = sync_port
         self.housekeeper_interval = housekeeper_interval
         
-        self.registry = ServiceRegistry()
-        self.watcher: WorkspaceFileWatcher | None = None
-        self.sync_server: HTTPServer | None = None
-        self.sync_thread: threading.Thread | None = None
+        config = APIConfig(model_gateway_provider="groq")
+        self.registry = ServiceRegistry(config)
         
-        self.stop_event = threading.Event()
+        self.sync_server: HTTPServer | None = None
+        self.web_server: ThreadingHTTPServer | None = None
+        self.watcher = None
+        self.sync_thread: threading.Thread | None = None
+        self.web_thread: threading.Thread | None = None
         self.housekeeper_thread: threading.Thread | None = None
         
+        self.stop_event = threading.Event()
+        
         self.watch_paths: list[str] = []
-        self.owns_ollama: bool = False
-        self.ollama_proc: subprocess.Popen | None = None
 
     def boot(self) -> None:
         """Initialize all components but do not start background threads yet."""
-        # 0. Ollama check, start, and pre-warm
-        try:
-            urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=1.0)
-            print("\n[ABM Launcher] Ollama already running.", flush=True)
-        except Exception:
-            print("\n[ABM Launcher] Started Ollama...", flush=True)
-            try:
-                self.ollama_proc = subprocess.Popen(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except FileNotFoundError:
-                print("\n[ABM Launcher] Ollama not found on PATH — install it or add it to PATH", flush=True)
-                sys.exit(1)
-            self.owns_ollama = True
-            for _ in range(30):
-                try:
-                    urllib.request.urlopen("http://127.0.0.1:11434/api/tags", timeout=1.0)
-                    break
-                except Exception:
-                    time.sleep(0.5)
-
-        print("[ABM Launcher] Pre-warming phi3:mini...", flush=True)
-        try:
-            req = urllib.request.Request(
-                "http://127.0.0.1:11434/api/generate",
-                data=json.dumps({"model": "phi3:mini", "prompt": "hi", "stream": False}).encode(),
-                headers={"Content-Type": "application/json"}
-            )
-            urllib.request.urlopen(req, timeout=30.0)
-            print("[ABM Launcher] phi3:mini pre-warmed.", flush=True)
-        except Exception as e:
-            logger.warning(f"Pre-warming failed: {e}")
-
+        print("\n[ABM Launcher] Booting with Groq as sole reasoning provider.", flush=True)
+        print("[ABM Launcher] Ollama is not started or required.", flush=True)
+        
         self.registry.boot()
         
         # 1. Setup Watcher
@@ -115,6 +140,10 @@ class ABMLauncher:
         SyncServerHandler.pairing_config = pairing_config
         self.sync_server = HTTPServer((self.sync_host, self.sync_port), SyncServerHandler)
         
+        # 3. Setup Web API Server
+        web_main.registry = self.registry
+        self.web_server = ThreadingHTTPServer(('127.0.0.1', 8080), ABMWebAPIHandler)
+        
     def start(self) -> None:
         """Start all background threads."""
         if not self.watcher or not self.sync_server:
@@ -127,34 +156,48 @@ class ABMLauncher:
         self.sync_thread = threading.Thread(target=self.sync_server.serve_forever, daemon=True)
         self.sync_thread.start()
         
+        # Start Web API server
+        if self.web_server:
+            self.web_thread = threading.Thread(target=self.web_server.serve_forever, daemon=True)
+            self.web_thread.start()
+        
         # Start housekeeper loop
         def _loop() -> None:
+            was_paused = False
             while not self.stop_event.is_set():
                 try:
-                    # pylint: disable=protected-access
-                    if self.registry._ambient_manager:
-                        self.registry._ambient_manager._writer._housekeeper.run_if_due()
+                    mem = psutil.virtual_memory()
+                    available_pct = (mem.available / mem.total) * 100
+                    
+                    if available_pct < 15.0:
+                        if not was_paused:
+                            logger.warning("[ABM Launcher] Memory pressure critical (%.1f%% available). Pausing housekeeper.", available_pct)
+                            was_paused = True
+                    elif was_paused and available_pct < 20.0:
+                        logger.info("[ABM Launcher] Memory dead zone active (%.1f%% available). Waiting for 20.0%% to resume.", available_pct)
+                    else:
+                        if was_paused:
+                            logger.info("[ABM Launcher] Memory recovered (%.1f%% available). Resuming housekeeper.", available_pct)
+                            was_paused = False
+                        
+                        # pylint: disable=protected-access
+                        if self.registry._ambient_manager:
+                            self.registry._ambient_manager._writer._housekeeper.run_if_due()
                 except Exception as e:
                     logger.error("Housekeeper error: %s", e)
-                self.stop_event.wait(self.housekeeper_interval)
+                
+                # Check memory pressure periodically; run_if_due manages the housekeeper interval internally.
+                self.stop_event.wait(15.0)
                 
         self.housekeeper_thread = threading.Thread(target=_loop, daemon=True)
         self.housekeeper_thread.start()
         
-        print(f"\n[ABM Launcher] Running: WorkspaceWatcher({len(self.watch_paths)} paths) | SyncServer({self.sync_host}:{self.sync_port}) | RetentionHousekeeper({self.housekeeper_interval}s loop)\n", flush=True)
+        print(f"\n[ABM Launcher] Running: WorkspaceWatcher({len(self.watch_paths)} paths) | WebAPI(127.0.0.1:8080) | SyncServer({self.sync_host}:{self.sync_port}) | RetentionHousekeeper({self.housekeeper_interval}s loop)\n", flush=True)
 
     def stop(self) -> None:
         """Cleanly shut down all threads and release resources."""
         print("\n[ABM Launcher] Shutting down cleanly...", flush=True)
         self.stop_event.set()
-        
-        if self.owns_ollama and self.ollama_proc:
-            print("[ABM Launcher] Stopping launcher-managed Ollama...", flush=True)
-            self.ollama_proc.terminate()
-            try:
-                self.ollama_proc.wait(timeout=2.0)
-            except subprocess.TimeoutExpired:
-                self.ollama_proc.kill()
         
         if self.watcher:
             self.watcher.stop()
@@ -167,6 +210,12 @@ class ABMLauncher:
                 self.sync_thread.join(timeout=2.0)
             self.sync_server.server_close()
             
+        if self.web_server:
+            threading.Thread(target=self.web_server.shutdown, daemon=True).start()
+            if self.web_thread:
+                self.web_thread.join(timeout=2.0)
+            self.web_server.server_close()
+            
         if self.housekeeper_thread:
             self.housekeeper_thread.join(timeout=2.0)
             
@@ -175,6 +224,10 @@ class ABMLauncher:
 
 
 def main() -> None:
+    # Load .env variables before any other initialization
+    load_dotenv()
+
+    # The rest of the setup...
     logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
     project_root = str(Path(__file__).resolve().parent.parent)
     

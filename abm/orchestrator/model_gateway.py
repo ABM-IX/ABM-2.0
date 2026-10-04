@@ -1,23 +1,23 @@
 """
 abm/orchestrator/model_gateway.py
 ===================================
-Ollama Model Gateway — Phase v0.3 Executive Orchestrator Engine
+Ollama Model Gateway â€” Phase v0.3 Executive Orchestrator Engine
 Spec Reference: ABM_SPEC.md section 4 ("Model Agnostic Channels")
 
 A thin, model-agnostic wrapper around Ollama's /api/generate endpoint.
-All calls route through the local loopback (127.0.0.1:11434) — no network
+All calls route through the local loopback (127.0.0.1:11434) â€” no network
 access. This parallels OllamaEmbeddingWrapper from v0.1 but targets
-text-generation models (phi3:mini for classification) rather than embedding.
+text-generation models (qwen2.5-coder:3b for classification) rather than embedding.
 
 Design contract:
   - generate() is the only write method. There is no stream(), complete(),
     or chat() method. The gateway is a single-call synchronous interface.
   - stream is always set to false so the full response arrives in one HTTP
     response body rather than a streaming chunked transfer.
-  - Returns GenerationResponse — a plain dataclass with text and latency_ms.
+  - Returns GenerationResponse â€” a plain dataclass with text and latency_ms.
   - Raises ModelGatewayError (RuntimeError subclass) on connection failure,
     timeout, or non-2xx HTTP. The router catches this and applies its fallback
-    policy — it never propagates to the caller.
+    policy â€” it never propagates to the caller.
   - is_available() does a HEAD /api/tags health check. It never raises.
   - The model name is injected at construction time to keep the gateway
     model-agnostic per spec section 4 protocol wrapper mandate.
@@ -38,7 +38,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 
 #: Classification model per spec section 4.
-DEFAULT_CLASSIFICATION_MODEL: str = "phi3:mini"
+DEFAULT_CLASSIFICATION_MODEL: str = "qwen2.5-coder:3b"
 
 #: Default Ollama loopback address.
 DEFAULT_HOST: str = "127.0.0.1"
@@ -107,7 +107,7 @@ class OllamaModelGateway(ModelGatewayInterface):
     Parameters
     ----------
     model : str
-        Ollama model name to use for generation. Defaults to ``"phi3:mini"``.
+        Ollama model name to use for generation. Defaults to ``"qwen2.5-coder:3b"``.
     host : str
         Ollama server host. Defaults to ``"127.0.0.1"``.
     port : int
@@ -135,7 +135,7 @@ class OllamaModelGateway(ModelGatewayInterface):
     # Public API
     # ------------------------------------------------------------------
 
-    def generate(self, prompt: str) -> GenerationResponse:
+    def generate(self, prompt: str, *, max_tokens: int = 0) -> GenerationResponse:
         """
         Send ``prompt`` to the model and return the full generated text.
 
@@ -146,6 +146,10 @@ class OllamaModelGateway(ModelGatewayInterface):
         ----------
         prompt : str
             The prompt to send to the model.
+        max_tokens : int
+            Maximum number of tokens to generate. 0 (default) means no cap
+            (Ollama's default behaviour). Set to ~180 for ``ask``-style synthesis
+            to keep responses short and prevent timeouts.
 
         Returns
         -------
@@ -168,6 +172,8 @@ class OllamaModelGateway(ModelGatewayInterface):
             "prompt": prompt,
             "stream": False,
         }
+        if max_tokens > 0:
+            payload["num_predict"] = max_tokens
 
         logger.debug(
             "OllamaModelGateway.generate: POST %s (model=%s, prompt_len=%d)",
@@ -202,7 +208,7 @@ class OllamaModelGateway(ModelGatewayInterface):
             model_name = data.get("model", self._model)
         except Exception as exc:
             raise ModelGatewayError(
-                f"OllamaModelGateway: failed to parse JSON response — {exc}"
+                f"OllamaModelGateway: failed to parse JSON response â€” {exc}"
             ) from exc
 
         logger.debug(
@@ -216,7 +222,7 @@ class OllamaModelGateway(ModelGatewayInterface):
         Check whether the local Ollama server is reachable.
 
         Performs a GET request to ``/api/tags`` (the lightest Ollama endpoint).
-        Never raises — returns ``False`` on any error.
+        Never raises â€” returns ``False`` on any error.
 
         Returns
         -------

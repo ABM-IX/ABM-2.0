@@ -13,8 +13,14 @@ def test_launcher_starts_and_stops_cleanly(tmp_path):
     with patch("abm.launcher.ServiceRegistry") as mock_registry_cls, \
          patch("abm.launcher.build_coordinator") as mock_build_coord, \
          patch("abm.launcher.WorkspaceFileWatcher") as mock_watcher_cls, \
-         patch("abm.launcher.HTTPServer") as mock_http_server_cls:
+         patch("abm.launcher.HTTPServer") as mock_http_server_cls, \
+         patch("abm.launcher.psutil.virtual_memory") as mock_vm:
              
+        mock_mem = MagicMock()
+        mock_mem.total = 100
+        mock_mem.available = 50
+        mock_vm.return_value = mock_mem
+        
         mock_registry = MagicMock()
         mock_registry_cls.return_value = mock_registry
         

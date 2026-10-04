@@ -33,6 +33,7 @@ import git
 from git import InvalidGitRepositoryError, NoSuchPathError, Repo
 
 from abm.memory.chunking import chunk_stream_a_code_topologies
+from abm.companion.file_watcher import _is_excluded
 
 logger = logging.getLogger(__name__)
 
@@ -290,7 +291,7 @@ class GitPipeline:
         results: list[FileDiff] = []
         for diff_item in diffs:
             path = diff_item.b_path or diff_item.a_path or ""
-            if not path:
+            if not path or _is_excluded(path):
                 continue
             added = self._extract_added_lines(diff_item)
             if not added.strip():

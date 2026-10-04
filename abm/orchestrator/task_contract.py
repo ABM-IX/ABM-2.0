@@ -1,22 +1,22 @@
-"""
+﻿"""
 abm/orchestrator/task_contract.py
 ===================================
-Task Contract & Router Result Schemas — Phase v0.3 Executive Orchestrator Engine
+Task Contract & Router Result Schemas â€” Phase v0.3 Executive Orchestrator Engine
 Spec Reference: ABM_SPEC.md section 5 ("The Task Contract Format")
 
 Defines the two Pydantic models that encode the complete output of the
 ClassificationRouter:
 
-  TaskContract  — the immutable delegation contract handed to a worker sandbox.
+  TaskContract  â€” the immutable delegation contract handed to a worker sandbox.
                   Its JSON shape matches the spec section 5 template exactly.
-  RouterResult  — wraps a TaskContract with routing metadata (model used,
+  RouterResult  â€” wraps a TaskContract with routing metadata (model used,
                   latency, raw classification string, confidence hint).
 
 Design contract:
   - TaskContract is the spec-canonical format. Its field names and types are
     fixed. Do not add fields without updating the spec.
   - RouterResult is the sole return type of ClassificationRouter.classify().
-    Callers interact with this object — they never interact with the router
+    Callers interact with this object â€” they never interact with the router
     beyond receiving this result.
   - Both models use extra="forbid" so any attempt to inject unknown fields is
     caught at construction time.
@@ -53,14 +53,14 @@ class TaskContract(BaseModel):
     contract_id : str
         Unique transaction ID in the format ``"TXN_{epoch_timestamp}"``.
     objective : str
-        The incoming task description verbatim — never transformed or truncated.
+        The incoming task description verbatim â€” never transformed or truncated.
     department : Department
         The department the router classified this task into.
     assigned_agents : list[str]
         Ordered list of agent identifiers authorised to work on this task.
         Sourced directly from ``DepartmentWorkerSandbox.assigned_agents``.
     autonomy_permission_level : int
-        Execution permission level (0–4) per spec section 7.
+        Execution permission level (0â€“4) per spec section 7.
     hard_success_conditions : list[str]
         Conditions that must be met for the task to be considered successful.
         Sourced from ``DepartmentWorkerSandbox.hard_success_conditions``.
@@ -99,7 +99,7 @@ class TaskContract(BaseModel):
     def _validate_autonomy_level(cls, value: int) -> int:
         if not 0 <= value <= 4:
             raise ValueError(
-                f"autonomy_permission_level must be 0–4, got {value}"
+                f"autonomy_permission_level must be 0â€“4, got {value}"
             )
         return value
 
@@ -197,14 +197,14 @@ class RouterResult(BaseModel):
     contract : TaskContract
         The fully-formed delegation contract.
     raw_classification : str
-        The exact department string as returned by phi3:mini before
+        The exact department string as returned by qwen2.5-coder:3b before
         normalisation. Useful for debugging model behaviour.
     confidence_hint : str
         The model's self-reported confidence: one of ``"high"``,
-        ``"medium"``, or ``"low"``. This is a hint only — the router does
+        ``"medium"``, or ``"low"``. This is a hint only â€” the router does
         not use it to gate routing decisions.
     model_used : str
-        The Ollama model name used for classification (e.g. ``"phi3:mini"``).
+        The Ollama model name used for classification (e.g. ``"qwen2.5-coder:3b"``).
     routing_latency_ms : int
         Wall-clock milliseconds from the start of ``classify()`` to the
         moment the ``RouterResult`` was assembled.

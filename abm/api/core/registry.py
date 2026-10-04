@@ -1,12 +1,12 @@
 """
 abm/api/core/registry.py
 ========================
-ServiceRegistry — boot / service-registration / shutdown lifecycle manager
+ServiceRegistry â€” boot / service-registration / shutdown lifecycle manager
 for the ABM API layer.
 
 Holds lazily-initialised singletons for every service the capability
 functions depend on. Callers obtain services through typed accessor
-properties — they never reach into internal ABM modules directly.
+properties â€” they never reach into internal ABM modules directly.
 
 Design contract (per CLIENT_01_CONSOLE.md):
   - boot()     : Create + warm-up all services in dependency order.
@@ -15,7 +15,7 @@ Design contract (per CLIENT_01_CONSOLE.md):
                      ChromaDB collections initialised?).
   - Services are NOT replaced after boot; the registry is single-use per
     process lifetime.
-  - This is NOT a formal DI/IoC container — that is an ARCHITECTURE_BACKLOG
+  - This is NOT a formal DI/IoC container â€” that is an ARCHITECTURE_BACKLOG
     candidate (see ARCHITECTURE_BACKLOG.md: "Dependency Injection /
     Service Registry"). This is plain shared-instance management with
     lifecycle discipline sufficient for today's single-client scope.
@@ -24,7 +24,7 @@ Design contract (per CLIENT_01_CONSOLE.md):
 
 Architectural Constitution compliance:
   - Rule 9  : health_check() returns degraded status, never crashes.
-  - Rule 1  : all services route through 127.0.0.1 — enforced by APIConfig.
+  - Rule 1  : all services route through 127.0.0.1 â€” enforced by APIConfig.
 """
 
 from __future__ import annotations
@@ -34,7 +34,14 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from abm.api.core.config import APIConfig
-from abm.api.core.interfaces import EmbedderInterface, ModelGatewayInterface, VectorStoreInterface
+from abm.api.core.interfaces import (
+    EmbedderInterface,
+    Event,
+    EventBusInterface,
+    ModelGatewayInterface,
+    SystemTopic,
+    VectorStoreInterface,
+)
 
 if TYPE_CHECKING:
     from abm.orchestrator.router import ClassificationRouter
@@ -71,8 +78,8 @@ class HealthStatus:
     def __str__(self) -> str:  # pragma: no cover
         status = "DEGRADED" if self.degraded else "OK"
         lines = [f"Health: {status}"]
-        lines.append(f"  Ollama : {'✓' if self.ollama_reachable else '✗ (not reachable)'}")
-        lines.append(f"  ChromaDB: {'✓' if self.chroma_ready else '✗ (not ready)'}")
+        lines.append(f"  Ollama : {'âœ“' if self.ollama_reachable else 'âœ— (not reachable)'}")
+        lines.append(f"  ChromaDB: {'âœ“' if self.chroma_ready else 'âœ— (not ready)'}")
         for note in self.notes:
             lines.append(f"  ! {note}")
         return "\n".join(lines)
@@ -88,9 +95,9 @@ class ServiceRegistry:
 
         config = APIConfig()
         registry = ServiceRegistry(config)
-        registry.boot()        # ← creates all services
-        # … use registry.router, registry.embedder, etc. …
-        registry.shutdown()    # ← releases resources
+        registry.boot()        # â† creates all services
+        # â€¦ use registry.router, registry.embedder, etc. â€¦
+        registry.shutdown()    # â† releases resources
 
     Services are accessed through read-only properties after ``boot()``.
     Accessing them before ``boot()`` raises ``RuntimeError``.
@@ -99,6 +106,7 @@ class ServiceRegistry:
     _controller: VectorStoreInterface | None
     _embedder: EmbedderInterface | None
     _gateway: ModelGatewayInterface | None
+    _event_bus: EventBusInterface | None
 
     def __init__(self, config: APIConfig | None = None) -> None:
         self._config: APIConfig = config or APIConfig()
@@ -108,6 +116,7 @@ class ServiceRegistry:
         self._controller: VectorStoreInterface | None = None
         self._embedder: EmbedderInterface | None = None
         self._gateway: ModelGatewayInterface | None = None
+        self._event_bus: EventBusInterface | None = None
         self._router: ClassificationRouter | None = None
         self._monitor: WorkflowMonitor | None = None
         self._analyzer: StrategicAssetAnalyzer | None = None
@@ -132,10 +141,10 @@ class ServiceRegistry:
             If boot fails for any critical service.
         """
         if self._booted:
-            logger.warning("ServiceRegistry.boot: already booted — ignoring.")
+            logger.warning("ServiceRegistry.boot: already booted â€” ignoring.")
             return
 
-        logger.info("ServiceRegistry: booting …")
+        logger.info("ServiceRegistry: booting â€¦")
 
         from abm.memory.chroma_controller import ChromaController
         from abm.memory.embedding_wrapper import OllamaEmbeddingWrapper
@@ -144,6 +153,19 @@ class ServiceRegistry:
         from abm.strategic_wing.strategic_asset_analyzer import StrategicAssetAnalyzer
         from abm.strategic_wing.workflow_monitor import WorkflowMonitor
         from abm.mobile.ambient_manager import AmbientInteractionManager, ManagerConfig
+        from abm.api.core.bus import EventBus
+
+        # 0. Event Bus — decoupled pub/sub subsystem (v2.0)
+        self._event_bus = EventBus()
+        self._event_bus.start()
+        self._event_bus.publish(
+            Event(
+                topic=SystemTopic.SYSTEM_BOOT,
+                payload={"status": "booting"},
+                source="registry",
+            )
+        )
+        logger.info("ServiceRegistry: EventBus ready.")
 
         # 1. ChromaDB — vector store (v0.1)
         try:
@@ -153,10 +175,10 @@ class ServiceRegistry:
             logger.info("ServiceRegistry: ChromaController ready.")
         except Exception as exc:
             raise RuntimeError(
-                f"ServiceRegistry: ChromaController boot failed — {exc}"
+                f"ServiceRegistry: ChromaController boot failed â€” {exc}"
             ) from exc
 
-        # 2. Embedding wrapper — Ollama nomic-embed-text (v0.1)
+        # 2. Embedding wrapper â€” Ollama nomic-embed-text (v0.1)
         self._embedder = OllamaEmbeddingWrapper(
             base_url=self._config.ollama_base_url,
             model=self._config.embedding_model,
@@ -165,12 +187,25 @@ class ServiceRegistry:
         )
         logger.info("ServiceRegistry: OllamaEmbeddingWrapper ready.")
 
-        # 3. Model gateway — Ollama phi3:mini (v0.3)
-        self._gateway = OllamaModelGateway(
-            model=self._config.classification_model,
-            timeout_seconds=self._config.read_timeout,
-        )
-        logger.info("ServiceRegistry: OllamaModelGateway ready.")
+        # 3. Model gateway — Ollama qwen2.5-coder:3b (v0.3) or Groq (opt-in via config)
+        # Constitution rule 1: Ollama is always default and fallback.
+        if self._config.model_gateway_provider == "groq":
+            from abm.orchestrator.groq_gateway import GroqModelGateway
+            self._gateway = GroqModelGateway(
+                groq_model=self._config.groq_model,
+                ollama_model=self._config.classification_model,
+                timeout_seconds=int(self._config.read_timeout),
+            )
+            logger.info(
+                "ServiceRegistry: GroqModelGateway ready (model=%s, Ollama fallback active).",
+                self._config.groq_model,
+            )
+        else:
+            self._gateway = OllamaModelGateway(
+                model=self._config.classification_model,
+                timeout_seconds=int(self._config.read_timeout),
+            )
+            logger.info("ServiceRegistry: OllamaModelGateway ready.")
 
         # 4. Classification router — uses gateway + optional stream D context (v0.3)
         self._router = ClassificationRouter(
@@ -180,20 +215,20 @@ class ServiceRegistry:
         )
         logger.info("ServiceRegistry: ClassificationRouter ready.")
 
-        # 5. Workflow monitor — read-only task state aggregator (v0.5)
+        # 5. Workflow monitor â€” read-only task state aggregator (v0.5)
         self._monitor = WorkflowMonitor(
             quarantine_dir=self._config.quarantine_dir
         )
         logger.info("ServiceRegistry: WorkflowMonitor ready.")
 
-        # 6. Strategic asset analyzer — multi-stream read-only analysis (v0.5)
+        # 6. Strategic asset analyzer â€” multi-stream read-only analysis (v0.5)
         self._analyzer = StrategicAssetAnalyzer(
             controller=self._controller,
             embedder=self._embedder,
         )
         logger.info("ServiceRegistry: StrategicAssetAnalyzer ready.")
 
-        # 7. Ambient interaction manager — Stream C retention-aware write path (v1.0)
+        # 7. Ambient interaction manager â€” Stream C retention-aware write path (v1.0)
         self._ambient_manager = AmbientInteractionManager(
             controller=self._controller,
             embedder=self._embedder,
@@ -211,11 +246,11 @@ class ServiceRegistry:
         Release all held resources and mark registry as shut down.
 
         Safe to call even if ``boot()`` was never called or failed partway
-        through. Idempotent — calling more than once is a no-op.
+        through. Idempotent â€” calling more than once is a no-op.
         """
         if not self._booted:
             return
-        logger.info("ServiceRegistry: shutting down …")
+        logger.info("ServiceRegistry: shutting down â€¦")
         # Services in reverse dependency order
         if self._ambient_manager is not None and self._ambient_manager.is_running:
             self._ambient_manager.stop()
@@ -226,6 +261,19 @@ class ServiceRegistry:
         self._gateway = None
         self._embedder = None
         self._controller = None
+        if self._event_bus is not None:
+            try:
+                self._event_bus.publish(
+                    Event(
+                        topic=SystemTopic.SYSTEM_SHUTDOWN,
+                        payload={"status": "shutdown"},
+                        source="registry",
+                    )
+                )
+            except Exception:
+                pass
+            self._event_bus.stop()
+        self._event_bus = None
         self._booted = False
         logger.info("ServiceRegistry: shutdown complete.")
 
@@ -233,7 +281,7 @@ class ServiceRegistry:
         """
         Non-destructive readiness probe.
 
-        Returns a ``HealthStatus`` with per-service flags. Never raises —
+        Returns a ``HealthStatus`` with per-service flags. Never raises â€”
         failures are captured into the status object (constitution rule 9).
 
         Returns
@@ -250,7 +298,7 @@ class ServiceRegistry:
             except Exception as exc:
                 notes.append(f"Ollama health probe error: {exc}")
         else:
-            notes.append("Ollama embedder not initialised — call boot() first.")
+            notes.append("Ollama embedder not initialised â€” call boot() first.")
 
         if not ollama_ok:
             notes.append(
@@ -266,12 +314,12 @@ class ServiceRegistry:
                 chroma_ok = count == 4
                 if not chroma_ok:
                     notes.append(
-                        f"ChromaDB has {count}/4 collections — expected 4."
+                        f"ChromaDB has {count}/4 collections â€” expected 4."
                     )
             except Exception as exc:
                 notes.append(f"ChromaDB health probe error: {exc}")
         else:
-            notes.append("ChromaController not initialised — call boot() first.")
+            notes.append("ChromaController not initialised â€” call boot() first.")
 
         degraded = not ollama_ok or not chroma_ok
         return HealthStatus(
@@ -288,7 +336,7 @@ class ServiceRegistry:
     def _require_booted(self, name: str) -> None:
         if not self._booted:
             raise RuntimeError(
-                f"ServiceRegistry: cannot access '{name}' — call boot() first."
+                f"ServiceRegistry: cannot access '{name}' â€” call boot() first."
             )
 
     @property
@@ -336,6 +384,12 @@ class ServiceRegistry:
         self._require_booted("ambient_manager")
         assert self._ambient_manager is not None
         return self._ambient_manager
+
+    @property
+    def event_bus(self) -> EventBusInterface:
+        self._require_booted("event_bus")
+        assert self._event_bus is not None
+        return self._event_bus
 
     @property
     def is_booted(self) -> bool:

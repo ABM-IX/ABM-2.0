@@ -23,6 +23,8 @@ from abm.api.capabilities import (
     MemoryResult,
     StatusResult,
     RunTaskResult,
+    IngestResult,
+    ReviewProjectResult,
 )
 from abm.memory.chroma_controller import (
     COLLECTION_AMBIENT_TELEMETRY,
@@ -326,6 +328,66 @@ def format_run(result: RunTaskResult) -> str:
         lines.append(f"\n  Task Dispatched: {result.task_id}")
         lines.append("  Worker execution has started in the background.")
         lines.append("  Use `abm status` or `abm explain <task_id>` to check progress.\n")
+
+    lines.append(_DIVIDER)
+    return "\n".join(lines)
+
+
+def format_ingest(result: IngestResult) -> str:
+    """Format the output of ``ingestDocument`` for terminal display."""
+    lines = [
+        _DIVIDER,
+        "  ABM › ingest",
+        f"  Path: {result.path}",
+        _DIVIDER,
+    ]
+
+    if result.degraded:
+        lines.append(_degraded_warning("ingest"))
+        lines.append("  Ingestion degraded or failed.\n")
+    else:
+        lines.append("\n  Ingestion Results:")
+        for r in result.results:
+            status = r["status"]
+            coll = _STREAM_LABELS.get(r["collection"], r["collection"])
+            reason = r["reason"]
+            count = len(r["doc_ids"])
+            
+            if status == "ok":
+                lines.append(f"  [OK] {coll}: {count} chunk(s) written.")
+            elif status == "skipped":
+                lines.append(f"  [SKIP] {reason}")
+            else:
+                lines.append(f"  [ERROR] {coll}: {reason}")
+        lines.append("")
+
+    lines.append(_DIVIDER)
+    return "\n".join(lines)
+
+
+def format_review(result: ReviewProjectResult) -> str:
+    """Format the output of ``reviewProject`` for terminal display."""
+    lines = [
+        _DIVIDER,
+        "  ABM › review",
+        f"  Project: {result.project_name}",
+        _DIVIDER,
+    ]
+
+    if result.degraded:
+        lines.append(_degraded_warning("review"))
+
+    lines.append("\n  Synthesis:")
+    for tl in result.synthesis.splitlines():
+        lines.append(f"    {tl}")
+        
+    lines.append("\n  --- Grounding (Stream A Code Snippets) ---\n")
+    if not result.hits:
+        lines.append("  No code topology chunks found.")
+    else:
+        for i, hit in enumerate(result.hits):
+            lines.append(_format_hit(hit, i))
+            lines.append("")
 
     lines.append(_DIVIDER)
     return "\n".join(lines)

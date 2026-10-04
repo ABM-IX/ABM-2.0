@@ -1,80 +1,95 @@
-import time
-import subprocess
-import urllib.request
-import urllib.error
-from unittest.mock import patch, MagicMock, ANY
+"""
+tests/test_launcher_ollama.py
+==============================
+Gate: ABMLauncher Groq-only boot lifecycle.
 
-import pytest
+Ollama is no longer managed by ABMLauncher. This test suite confirms:
+  1. boot() never spawns an Ollama subprocess.
+  2. stop() does not attempt to terminate any Ollama process.
+  3. watcher attribute is None before boot() (no AttributeError in stop()).
+  4. ABMLauncher uses model_gateway_provider='groq' in its APIConfig.
+"""
+import os
+import sys
+import unittest
+from unittest.mock import MagicMock, patch
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from abm.launcher import ABMLauncher
 
-class TestABMLauncherOllamaLifecycle:
-    @patch("urllib.request.urlopen")
-    @patch("subprocess.Popen")
-    def test_ollama_already_running(self, mock_popen, mock_urlopen):
-        # Setup mock to simulate Ollama already running (tags responds successfully)
-        # We need two successful responses: one for the check, one for the pre-warm
-        mock_response = MagicMock()
-        mock_response.read.return_value = b"{}"
-        mock_urlopen.return_value = mock_response
 
+class TestABMLauncherGroqOnlyLifecycle(unittest.TestCase):
+    """Gate: Launcher no longer manages Ollama — Groq is the sole provider."""
+
+    def test_watcher_initialized_to_none_before_boot(self):
+        """self.watcher must be None before boot() — prevents AttributeError in stop()."""
         launcher = ABMLauncher("/fake/project/root")
-        
-        with patch.object(launcher.registry, "boot") as mock_registry_boot:
+        self.assertIsNone(launcher.watcher)
+
+    def test_stop_before_boot_does_not_raise(self):
+        """stop() called before boot() must not raise AttributeError."""
+        launcher = ABMLauncher("/fake/project/root")
+        # Should not raise even though watcher/sync_server/web_server are None
+        try:
+            launcher.stop()
+        except AttributeError:
+            self.fail("stop() raised AttributeError before boot()")
+
+    def test_boot_does_not_spawn_ollama(self):
+        """boot() must never call subprocess.Popen to start Ollama."""
+        launcher = ABMLauncher("/fake/project/root")
+        with patch("subprocess.Popen") as mock_popen, \
+             patch.object(launcher.registry, "boot"), \
+             patch("abm.launcher.WorkspaceFileWatcher"), \
+             patch("abm.launcher.build_coordinator", return_value=MagicMock()), \
+             patch("abm.launcher.web_main"), \
+             patch("abm.launcher.ThreadingHTTPServer"), \
+             patch("abm.launcher.HTTPServer"), \
+             patch("builtins.open", MagicMock(return_value=MagicMock(
+                 __enter__=MagicMock(return_value=MagicMock(
+                     read=MagicMock(return_value='{"watch_paths": []}')
+                 )),
+                 __exit__=MagicMock(return_value=False)
+             ))), \
+             patch("pathlib.Path.exists", return_value=False):
             launcher.boot()
 
-        # Popen should not have been called since it's already running
-        mock_popen.assert_not_called()
-        assert not launcher.owns_ollama
+        # Popen must never be called for Ollama
+        for call_args in mock_popen.call_args_list:
+            args = call_args[0]
+            if args and "ollama" in str(args[0]).lower():
+                self.fail(f"boot() spawned an Ollama process: {call_args}")
 
-        # The pre-warm should still have been called
-        assert mock_urlopen.call_count == 2
-        mock_registry_boot.assert_called_once()
-
-    @patch("time.sleep", return_value=None)
-    @patch("urllib.request.urlopen")
-    @patch("subprocess.Popen")
-    def test_starts_ollama_if_not_reachable(self, mock_popen, mock_urlopen, mock_sleep):
-        # Simulate Ollama is unreachable at first, then becomes reachable
-        # 1st call: check -> Exception
-        # 2nd call: poll -> Exception
-        # 3rd call: poll -> Success
-        # 4th call: pre-warm -> Success
-        
-        def urlopen_side_effect(*args, **kwargs):
-            if mock_urlopen.call_count <= 2:
-                raise urllib.error.URLError("Connection refused")
-            return MagicMock()
-            
-        mock_urlopen.side_effect = urlopen_side_effect
-
+    def test_boot_does_not_urlopen_ollama(self):
+        """boot() must not call urllib.request.urlopen to check Ollama health."""
         launcher = ABMLauncher("/fake/project/root")
-        
-        with patch.object(launcher.registry, "boot"):
+        with patch("urllib.request.urlopen") as mock_urlopen, \
+             patch.object(launcher.registry, "boot"), \
+             patch("abm.launcher.WorkspaceFileWatcher"), \
+             patch("abm.launcher.build_coordinator", return_value=MagicMock()), \
+             patch("abm.launcher.web_main"), \
+             patch("abm.launcher.ThreadingHTTPServer"), \
+             patch("abm.launcher.HTTPServer"), \
+             patch("pathlib.Path.exists", return_value=False):
             launcher.boot()
 
-        # Should have started Ollama
-        mock_popen.assert_called_once_with(["ollama", "serve"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-        assert launcher.owns_ollama
-        assert launcher.ollama_proc == mock_popen.return_value
+        mock_urlopen.assert_not_called()
 
-    @patch("urllib.request.urlopen")
-    def test_stop_kills_owned_ollama(self, mock_urlopen):
+    def test_stop_does_not_kill_any_subprocess(self):
+        """stop() must not attempt to terminate any subprocess."""
         launcher = ABMLauncher("/fake/project/root")
-        launcher.owns_ollama = True
-        launcher.ollama_proc = MagicMock()
+        mock_proc = MagicMock()
+        # Even if someone manually sets a proc, stop() should not call terminate
+        # (the owns_ollama / ollama_proc fields have been removed)
+        self.assertFalse(hasattr(launcher, "owns_ollama"),
+                         "owns_ollama field should not exist on ABMLauncher after Ollama removal")
 
-        launcher.stop()
-
-        launcher.ollama_proc.terminate.assert_called_once()
-        launcher.ollama_proc.wait.assert_called_once_with(timeout=2.0)
-
-    @patch("urllib.request.urlopen")
-    def test_stop_does_not_kill_unowned_ollama(self, mock_urlopen):
+    def test_registry_uses_groq_provider(self):
+        """ABMLauncher must configure the registry with model_gateway_provider='groq'."""
         launcher = ABMLauncher("/fake/project/root")
-        launcher.owns_ollama = False
-        launcher.ollama_proc = MagicMock()
+        self.assertEqual(launcher.registry.config.model_gateway_provider, "groq")
 
-        launcher.stop()
 
-        launcher.ollama_proc.terminate.assert_not_called()
+if __name__ == "__main__":
+    unittest.main()

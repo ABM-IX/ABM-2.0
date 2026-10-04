@@ -185,9 +185,11 @@ class TestSyncPairingGitignoreGate:
             content = f.read()
             assert ".sync_pairing.json" in content
             
+        created_by_test = False
         if not os.path.exists(test_file):
             with open(test_file, "w") as f:
                 f.write("{}")
+            created_by_test = True
                 
         try:
             result = subprocess.run(
@@ -197,5 +199,126 @@ class TestSyncPairingGitignoreGate:
             )
             assert result.returncode == 0, ".sync_pairing.json must be covered by .gitignore"
         finally:
-            if os.path.exists(test_file):
+            if created_by_test and os.path.exists(test_file):
                 os.remove(test_file)
+
+
+class TestRemoteCommandDispatchGate:
+    """
+    Gate: /api/sync/command — Tier-1 remote command dispatch.
+
+    Connectivity note: requires both devices on the same LAN/VPN.
+    NOT internet-accessible. Tests use the mock handler pattern.
+    """
+
+    def _make_command_handler(self, pairing_config):
+        """Create a mock SyncServerHandler with handle_command bound."""
+        from unittest.mock import MagicMock
+        from abm.mobile.sync_server import SyncServerHandler
+
+        handler = MagicMock(spec=SyncServerHandler)
+        handler.pairing_config = pairing_config
+        handler.registry = MagicMock()
+        handler.sent_json = {}
+        handler.sent_status = 0
+
+        def mock_send_json(status, data):
+            handler.sent_status = status
+            handler.sent_json = data
+
+        handler._send_json = mock_send_json
+        handler.handle_command = SyncServerHandler.handle_command.__get__(handler, SyncServerHandler)
+        return handler
+
+    def test_valid_open_command_dispatches(self, dummy_key, dummy_key_id, pairing_config):
+        """A well-formed encrypted 'open notepad' command must succeed."""
+        from unittest.mock import patch
+        from abm.automation.launcher_map import LaunchResult
+
+        handler = self._make_command_handler(pairing_config)
+        cmd_payload = {"action": "open", "app": "notepad"}
+        payload = make_dart_encrypted_payload(dummy_key, dummy_key_id, cmd_payload)
+
+        mock_launch_result = LaunchResult(success=True, command="notepad", pid=9999, error="")
+        with patch("abm.mobile.sync_server.DynamicLauncher") as MockLauncher:
+            MockLauncher.return_value.launch.return_value = mock_launch_result
+            handler.handle_command(payload)
+
+        assert handler.sent_status == 200
+        assert handler.sent_json["status"] == "ok"
+        assert handler.sent_json["app"] == "notepad"
+        assert handler.sent_json["pid"] == 9999
+
+    def test_unlisted_app_is_rejected(self, dummy_key, dummy_key_id, pairing_config):
+        """Apps not in DIRECT_APP_MAP must be rejected with 400."""
+        handler = self._make_command_handler(pairing_config)
+        cmd_payload = {"action": "open", "app": "rm_rf_everything"}
+        payload = make_dart_encrypted_payload(dummy_key, dummy_key_id, cmd_payload)
+
+        handler.handle_command(payload)
+
+        assert handler.sent_status == 400
+        assert "not in the Tier-1 allowlist" in handler.sent_json["error"]
+
+    def test_invalid_action_is_rejected(self, dummy_key, dummy_key_id, pairing_config):
+        """Actions other than 'open'/'close' must be rejected with 400."""
+        handler = self._make_command_handler(pairing_config)
+        cmd_payload = {"action": "delete", "app": "notepad"}
+        payload = make_dart_encrypted_payload(dummy_key, dummy_key_id, cmd_payload)
+
+        handler.handle_command(payload)
+
+        assert handler.sent_status == 400
+        assert "Invalid action" in handler.sent_json["error"]
+
+    def test_wrong_key_rejected(self, dummy_key_id, pairing_config):
+        """Wrong encryption key must result in 401 Decryption failed."""
+        wrong_key = AESGCM.generate_key(bit_length=256)
+        handler = self._make_command_handler(pairing_config)
+        cmd_payload = {"action": "open", "app": "notepad"}
+        payload = make_dart_encrypted_payload(wrong_key, dummy_key_id, cmd_payload)
+
+        handler.handle_command(payload)
+
+        assert handler.sent_status == 401
+        assert handler.sent_json["error"] == "Decryption failed"
+
+    def test_wrong_key_id_rejected(self, dummy_key, pairing_config):
+        """Wrong key_id must result in 401."""
+        handler = self._make_command_handler(pairing_config)
+        cmd_payload = {"action": "open", "app": "notepad"}
+        payload = make_dart_encrypted_payload(dummy_key, "wrong-key-id", cmd_payload)
+
+        handler.handle_command(payload)
+
+        assert handler.sent_status == 401
+        assert "key_id" in handler.sent_json["error"]
+
+    def test_handshake_advertises_remote_command_capability(self, pairing_config):
+        """Handshake must now include 'remote_command_v1' in capabilities."""
+        handler = create_mock_handler(pairing_config)
+        handler.handle_handshake({
+            "protocol_version": 1,
+            "key_id": pairing_config["key_id"],
+            "node_id": "test-node",
+            "algorithm": "AES-256-GCM",
+            "created_at_epoch": int(time.time()),
+            "capabilities": []
+        })
+        assert handler.sent_status == 200
+        assert "remote_command_v1" in handler.sent_json["capabilities"]
+
+    def test_valid_close_command_when_app_not_running(self, dummy_key, dummy_key_id, pairing_config):
+        """A 'close' command when the app is not running must return 200 not_running."""
+        from unittest.mock import patch
+
+        handler = self._make_command_handler(pairing_config)
+        cmd_payload = {"action": "close", "app": "notepad"}
+        payload = make_dart_encrypted_payload(dummy_key, dummy_key_id, cmd_payload)
+
+        with patch("abm.mobile.sync_server.psutil.process_iter", return_value=[]):
+            handler.handle_command(payload)
+
+        assert handler.sent_status == 200
+        assert handler.sent_json["status"] == "not_running"
+

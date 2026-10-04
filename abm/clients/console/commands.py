@@ -33,8 +33,9 @@ from abm.api.capabilities import (
     explainAuditRecord,
     getSystemStatus,
     retrieveKnowledge,
-    summarizeProject,
     runTask,
+    ingestDocument,
+    reviewProject,
 )
 from abm.api.core.registry import ServiceRegistry
 from abm.clients.console.formatter import (
@@ -45,12 +46,14 @@ from abm.clients.console.formatter import (
     format_status,
     format_summarize,
     format_run,
+    format_ingest,
+    format_review,
 )
 
 logger = logging.getLogger(__name__)
 
 
-def cmd_ask(question: str, *, registry: ServiceRegistry) -> str:
+def cmd_ask(question: str, *, registry: ServiceRegistry, history: list[dict[str, str]] | None = None) -> str:
     """
     ``ask <question>`` — route through the v0.3 router, retrieve from
     the department's allowed streams, return formatted hits.
@@ -59,7 +62,14 @@ def cmd_ask(question: str, *, registry: ServiceRegistry) -> str:
     """
     logger.debug("cmd_ask: question=%r", question)
     try:
-        result = answerQuestion(question, registry=registry)
+        result = answerQuestion(question, registry=registry, history=history)
+        
+        if history is not None:
+            history.append({"role": "user", "content": question})
+            history.append({"role": "agent", "content": result.synthesis})
+            # Keep only the last 3 exchanges (6 items)
+            del history[:-6]
+            
         return format_ask(result)
     except Exception as exc:
         logger.error("cmd_ask: unexpected error — %s", exc)
@@ -168,6 +178,36 @@ def cmd_run(objective: str, *, registry: ServiceRegistry) -> str:
         return f"[run error]: {exc}"
 
 
+def cmd_ingest(path: str, *, registry: ServiceRegistry) -> str:
+    """
+    ``ingest <path>`` — manually ingest a document or directory into ABM streams.
+
+    Wires to: ``ingestDocument`` (stable)
+    """
+    logger.debug("cmd_ingest: path=%r", path)
+    try:
+        result = ingestDocument(path, registry=registry)
+        return format_ingest(result)
+    except Exception as exc:
+        logger.error("cmd_ingest: unexpected error — %s", exc)
+        return f"[ingest error]: {exc}"
+
+
+def cmd_review(project: str, *, registry: ServiceRegistry) -> str:
+    """
+    ``review <project>`` — retrieves a project's Stream A entries and synthesizes 
+    actionable improvement suggestions grounded strictly in what was actually ingested.
+
+    Wires to: ``reviewProject`` (stable)
+    """
+    logger.debug("cmd_review: project=%r", project)
+    try:
+        result = reviewProject(project, registry=registry)
+        return format_review(result)
+    except Exception as exc:
+        logger.error("cmd_review: unexpected error — %s", exc)
+        return f"[review error]: {exc}"
+
 
 __all__ = [
     "cmd_ask",
@@ -177,4 +217,6 @@ __all__ = [
     "cmd_memory",
     "cmd_explain",
     "cmd_run",
+    "cmd_ingest",
+    "cmd_review",
 ]

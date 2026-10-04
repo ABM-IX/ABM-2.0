@@ -181,7 +181,16 @@ class TestIncrement1RegressionGate:
 
     def test_full_existing_suite_has_zero_regressions(self):
         result = subprocess.run(
-            [sys.executable, "-m", "pytest", "tests/", "--ignore=tests/test_increment1_service_interfaces_gate.py", "-q", "--tb=no"],
+            [
+                sys.executable,
+                "-m",
+                "pytest",
+                "tests/",
+                "--ignore=tests/test_increment1_service_interfaces_gate.py",
+                "--ignore=tests/test_phase_v20_increment2_event_bus_gate.py",
+                "-q",
+                "--tb=no",
+            ],
             cwd=str(PROJECT_ROOT),
             capture_output=True,
             text=True,

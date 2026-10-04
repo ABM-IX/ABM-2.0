@@ -1,15 +1,15 @@
-"""
+﻿"""
 tests/test_phase_v03_gate.py
 =============================
-Phase v0.3 Gate Tests — Executive Orchestrator Engine
+Phase v0.3 Gate Tests â€” Executive Orchestrator Engine
 Spec Reference: ABM_SPEC.md sections 4, 5, 7, and 10 (item 3)
 
 Hard gate proofs (must be 100% green before Phase v0.4):
-  1. TestRouterClassificationOnlyGate — router never generates content and
+  1. TestRouterClassificationOnlyGate â€” router never generates content and
      never calls a worker; classify() returns a classification only
-  2. TestWorkerSandboxScopeIsolationGate — each sandbox can only access
+  2. TestWorkerSandboxScopeIsolationGate â€” each sandbox can only access
      streams/tools scoped to its department, never others
-  3. TestDelegationAndReportSchemaGate — TaskContract / WorkerTaskHandoff /
+  3. TestDelegationAndReportSchemaGate â€” TaskContract / WorkerTaskHandoff /
      WorkerResultReport validate; malformed payloads are rejected
 
 Supporting contract tests cover departments, gateway, fallback, and
@@ -115,10 +115,10 @@ STRATEGIC_JSON_RESPONSE = json.dumps(
 
 def _make_mock_gateway(response_text: str = GOOD_JSON_RESPONSE) -> MagicMock:
     gw = MagicMock(spec=OllamaModelGateway)
-    gw.model = "phi3:mini"
+    gw.model = "qwen2.5-coder:3b"
     gw.base_url = "http://127.0.0.1:11434"
     gw.generate.return_value = GenerationResponse(
-        text=response_text, latency_ms=120, model="phi3:mini"
+        text=response_text, latency_ms=120, model="qwen2.5-coder:3b"
     )
     gw.is_available.return_value = True
     return gw
@@ -139,14 +139,14 @@ def _make_mock_embedder() -> MagicMock:
 
 
 # ---------------------------------------------------------------------------
-# HARD GATE 1 — router classifies only; never generates; never calls workers
+# HARD GATE 1 â€” router classifies only; never generates; never calls workers
 # ---------------------------------------------------------------------------
 
 
 class TestRouterClassificationOnlyGate(unittest.TestCase):
     """
     Prove ClassificationRouter never generates content and never invokes a
-    worker sandbox — classify() returns a classification (RouterResult) only.
+    worker sandbox â€” classify() returns a classification (RouterResult) only.
     """
 
     BANNED_CONTENT_METHODS = (
@@ -217,7 +217,7 @@ class TestRouterClassificationOnlyGate(unittest.TestCase):
                 wraps=WorkerResultReport.build,
             ) as report_build,
         ):
-            # Patch where router would import them if it called workers —
+            # Patch where router would import them if it called workers â€”
             # router module must not reference these builders at all.
             result = self.router.classify("Scan for plaintext secrets")
             self.assertIsInstance(result, RouterResult)
@@ -228,7 +228,7 @@ class TestRouterClassificationOnlyGate(unittest.TestCase):
         source = inspect.getsource(router_module)
         self.assertNotIn("WorkerTaskHandoff", source)
         self.assertNotIn("WorkerResultReport", source)
-        # Classification output only — no worker execution vocabulary
+        # Classification output only â€” no worker execution vocabulary
         for token in ("dispatch_worker", "execute_contract", "run_sandbox"):
             with self.subTest(token=token):
                 self.assertNotIn(token, source)
@@ -236,21 +236,21 @@ class TestRouterClassificationOnlyGate(unittest.TestCase):
     def test_classify_only_calls_gateway_generate_not_worker_tools(self):
         result = self.router.classify("Refactor navigation stack")
         self.gateway.generate.assert_called_once()
-        # Gateway is the classification model — no other side-effect APIs
+        # Gateway is the classification model â€” no other side-effect APIs
         self.assertFalse(hasattr(self.gateway, "execute_worker"))
         self.assertIsInstance(result, RouterResult)
         self.assertEqual(result.contract.department, Department.SOFTWARE_ENGINEERING)
 
 
 # ---------------------------------------------------------------------------
-# HARD GATE 2 — sandbox stream/tool isolation per department
+# HARD GATE 2 â€” sandbox stream/tool isolation per department
 # ---------------------------------------------------------------------------
 
 
 class TestWorkerSandboxScopeIsolationGate(unittest.TestCase):
     """
     Prove each department sandbox can only access its scoped streams and
-    tools — never another department's exclusive resources.
+    tools â€” never another department's exclusive resources.
     """
 
     def test_every_allowed_stream_is_accessible_and_denied_streams_are_not(self):
@@ -352,7 +352,7 @@ class TestWorkerSandboxScopeIsolationGate(unittest.TestCase):
 
 
 # ---------------------------------------------------------------------------
-# HARD GATE 3 — delegation + result-report schemas; reject malformed JSON
+# HARD GATE 3 â€” delegation + result-report schemas; reject malformed JSON
 # ---------------------------------------------------------------------------
 
 
@@ -987,7 +987,7 @@ class TestRouterResultSchema(unittest.TestCase):
             contract=contract,
             raw_classification="software_engineering",
             confidence_hint="high",
-            model_used="phi3:mini",
+            model_used="qwen2.5-coder:3b",
             routing_latency_ms=150,
             fallback_used=False,
         )
@@ -1058,7 +1058,7 @@ class TestRouterResultValidation(unittest.TestCase):
                 contract=self._base_contract(),
                 raw_classification="software_engineering",
                 confidence_hint="very_sure",  # invalid
-                model_used="phi3:mini",
+                model_used="qwen2.5-coder:3b",
                 routing_latency_ms=100,
             )
 
@@ -1069,7 +1069,7 @@ class TestRouterResultValidation(unittest.TestCase):
                 contract=self._base_contract(),
                 raw_classification="software_engineering",
                 confidence_hint="high",
-                model_used="phi3:mini",
+                model_used="qwen2.5-coder:3b",
                 routing_latency_ms=-1,
             )
 
@@ -1080,7 +1080,7 @@ class TestRouterResultValidation(unittest.TestCase):
                 contract=self._base_contract(),
                 raw_classification="x",
                 confidence_hint="low",
-                model_used="phi3:mini",
+                model_used="qwen2.5-coder:3b",
                 routing_latency_ms=0,
                 illegal_extra="oops",
             )
@@ -1267,11 +1267,11 @@ class TestModelGatewayGenerate(unittest.TestCase):
             mock_resp.status_code = 200
             mock_resp.json.return_value = {
                 "response": '{"department": "security", "confidence": "high"}',
-                "model": "phi3:mini",
+                "model": "qwen2.5-coder:3b",
             }
             mock_post.return_value = mock_resp
 
-            gw = OllamaModelGateway(model="phi3:mini", host="127.0.0.1", port=11434)
+            gw = OllamaModelGateway(model="qwen2.5-coder:3b", host="127.0.0.1", port=11434)
             result = gw.generate("classify this")
 
         mock_post.assert_called_once()
@@ -1283,7 +1283,7 @@ class TestModelGatewayGenerate(unittest.TestCase):
         with patch("abm.orchestrator.model_gateway.requests.post") as mock_post:
             mock_resp = MagicMock()
             mock_resp.status_code = 200
-            mock_resp.json.return_value = {"response": "hello", "model": "phi3:mini"}
+            mock_resp.json.return_value = {"response": "hello", "model": "qwen2.5-coder:3b"}
             mock_post.return_value = mock_resp
 
             gw = OllamaModelGateway()
@@ -1297,7 +1297,7 @@ class TestModelGatewayGenerate(unittest.TestCase):
         with patch("abm.orchestrator.model_gateway.requests.post") as mock_post:
             mock_resp = MagicMock()
             mock_resp.status_code = 200
-            mock_resp.json.return_value = {"response": "x", "model": "phi3:mini"}
+            mock_resp.json.return_value = {"response": "x", "model": "qwen2.5-coder:3b"}
             mock_post.return_value = mock_resp
 
             gw = OllamaModelGateway()
@@ -1384,7 +1384,7 @@ class TestModelGatewayAvailability(unittest.TestCase):
                 self.fail(f"is_available() raised unexpectedly: {exc}")
 
     def test_default_model_is_phi3_mini(self):
-        self.assertEqual(DEFAULT_CLASSIFICATION_MODEL, "phi3:mini")
+        self.assertEqual(DEFAULT_CLASSIFICATION_MODEL, "qwen2.5-coder:3b")
 
 
 # ---------------------------------------------------------------------------
@@ -1468,7 +1468,7 @@ class TestClassificationRouterClassify(unittest.TestCase):
 
     def test_classify_model_used_is_gateway_model(self):
         result = self.router.classify("Some task")
-        self.assertEqual(result.model_used, "phi3:mini")
+        self.assertEqual(result.model_used, "qwen2.5-coder:3b")
 
     def test_classify_routing_latency_ms_non_negative(self):
         result = self.router.classify("Some task")
@@ -1512,7 +1512,7 @@ class TestClassificationRouterClassify(unittest.TestCase):
 
 
 class TestClassificationRouterFallback(unittest.TestCase):
-    """Gateway failure → fallback result, fallback_used=True, never raises."""
+    """Gateway failure â†’ fallback result, fallback_used=True, never raises."""
 
     def test_fallback_on_model_gateway_error(self):
         gw = _make_mock_gateway()
@@ -1542,7 +1542,7 @@ class TestClassificationRouterFallback(unittest.TestCase):
 
 
 class TestClassificationRouterBadJSON(unittest.TestCase):
-    """Non-JSON or malformed model output → fallback result."""
+    """Non-JSON or malformed model output â†’ fallback result."""
 
     def _router_with_response(self, text: str) -> ClassificationRouter:
         gw = _make_mock_gateway(text)
@@ -1577,7 +1577,7 @@ class TestClassificationRouterBadJSON(unittest.TestCase):
 
 
 class TestClassificationRouterUnknownDept(unittest.TestCase):
-    """Unknown department string from model → fallback, no raise."""
+    """Unknown department string from model â†’ fallback, no raise."""
 
     def test_unknown_department_uses_fallback(self):
         bad_response = json.dumps({"department": "quantum_computing", "confidence": "high"})
@@ -1603,7 +1603,7 @@ class TestClassificationRouterUnknownDept(unittest.TestCase):
 
 
 class TestClassificationRouterEmptyInput(unittest.TestCase):
-    """Empty or whitespace-only task descriptions → fallback, never raises."""
+    """Empty or whitespace-only task descriptions â†’ fallback, never raises."""
 
     def setUp(self):
         self.router = ClassificationRouter(gateway=_make_mock_gateway())
@@ -1677,7 +1677,7 @@ class TestRouterStreamDContextInjection(unittest.TestCase):
         self.assertEqual(collection_arg, COLLECTION_COGNITIVE_IDENTITY)
 
     def test_context_injection_never_calls_add_document(self):
-        """Router must never write to ChromaDB — read-only during classification."""
+        """Router must never write to ChromaDB â€” read-only during classification."""
         gw = _make_mock_gateway(GOOD_JSON_RESPONSE)
         ctrl = _make_mock_controller()
         emb = _make_mock_embedder()
@@ -1798,7 +1798,7 @@ class TestV01V02V03RegressionGate(unittest.TestCase):
         self.assertEqual(CONFIDENCE_HINTS, {"high", "medium", "low"})
 
     def test_default_classification_model_is_phi3_mini(self):
-        self.assertEqual(DEFAULT_CLASSIFICATION_MODEL, "phi3:mini")
+        self.assertEqual(DEFAULT_CLASSIFICATION_MODEL, "qwen2.5-coder:3b")
 
     def test_max_task_description_chars_is_2000(self):
         self.assertEqual(MAX_TASK_DESCRIPTION_CHARS, 2000)

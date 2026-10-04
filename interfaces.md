@@ -1,5 +1,5 @@
 # interfaces.md
-# ABM 2.0 — Phases v0.1 & v0.2
+# ABM 2.0 â€” Phases v0.1 & v0.2
 # Complete API Reference: Every Function Signature, File Path, and Metadata Shape
 
 > This document is the single source of truth for every public interface
@@ -19,7 +19,7 @@
 7. [Module: `abm.memory.chunking`](#module-abmmemory-chunking)
 8. [Module: `abm.memory` (package)](#module-abmmemory-package)
 9. [Constants Reference (v0.1)](#constants-reference)
-10. [Phase v0.2 — Developer Companion Node](#phase-v02--developer-companion-node)
+10. [Phase v0.2 â€” Developer Companion Node](#phase-v02--developer-companion-node)
     - [Module: `abm.companion.file_watcher`](#module-abmcompanion-file_watcher)
     - [Module: `abm.companion.git_pipeline`](#module-abmcompanion-git_pipeline)
     - [Module: `abm.companion.code_structure_analyzer`](#module-abmcompanion-code_structure_analyzer)
@@ -28,19 +28,19 @@
     - [Module: `abm.companion.watch_daemon`](#module-abmcompanion-watch_daemon)
     - [Module: `abm.companion` (package)](#module-abmcompanion-package)
     - [Constants Reference (v0.2)](#constants-reference-v02)
-11. [Phase v0.3 — Executive Orchestrator Engine](#phase-v03--executive-orchestrator-engine)
+11. [Phase v0.3 â€” Executive Orchestrator Engine](#phase-v03--executive-orchestrator-engine)
     - [Module: `abm.orchestrator.departments`](#module-abmorchestrator-departments)
     - [Module: `abm.orchestrator.task_contract`](#module-abmorchestrator-task_contract)
     - [Module: `abm.orchestrator.model_gateway`](#module-abmorchestrator-model_gateway)
     - [Module: `abm.orchestrator.router`](#module-abmorchestrator-router)
     - [Module: `abm.orchestrator` (package)](#module-abmorchestrator-package)
-12. [Phase v0.4 — Safe Action Sandbox](#phase-v04--safe-action-sandbox)
+12. [Phase v0.4 â€” Safe Action Sandbox](#phase-v04--safe-action-sandbox)
     - [Module: `abm.sandbox.models`](#module-abmsandbox-models)
     - [Module: `abm.sandbox.container`](#module-abmsandbox-container)
     - [Module: `abm.sandbox.execution_loop`](#module-abmsandbox-execution_loop)
     - [Module: `abm.sandbox.validation_gate`](#module-abmsandbox-validation_gate)
     - [Module: `abm.sandbox` (package)](#module-abmsandbox-package)
-13. [Phase v0.5 — FirstMinds Strategic Wing](#phase-v05--firstminds-strategic-wing)
+13. [Phase v0.5 â€” FirstMinds Strategic Wing](#phase-v05--firstminds-strategic-wing)
     - [Module: `abm.strategic_wing.decision_journal`](#module-abmstrategic_wing-decision_journal)
     - [Module: `abm.strategic_wing.workflow_monitor`](#module-abmstrategic_wing-workflow_monitor)
     - [Module: `abm.strategic_wing.strategic_asset_analyzer`](#module-abmstrategic_wing-strategic_asset_analyzer)
@@ -54,63 +54,63 @@
 
 ```
 ABM-2.0/
-├── abm/
-│   ├── __init__.py                    # Package root — version and phase metadata
-│   ├── launcher.py                    # Unified entry point for background threads
-│   ├── api/                           # API Layer
-│   │   └── core/
-│   │       ├── config.py
-│   │       ├── interfaces.py          # Abstract interfaces for swappable services
-│   │       └── registry.py            # ServiceRegistry container
-│   ├── memory/                        # v0.1 — sealed, do not modify
-│   │   ├── __init__.py                # Re-exports all v0.1 public symbols
-│   │   ├── chroma_controller.py       # ChromaDB collection manager
-│   │   ├── embedding_wrapper.py       # Ollama nomic-embed-text connector
-│   │   ├── chunking.py                # Stream A/B/C chunking helpers
-│   │   └── metadata_models.py         # Pydantic metadata validators
-│   └── companion/                     # v0.2 — Developer Companion Node
-│       ├── __init__.py                # Re-exports all v0.2 public symbols
-│       ├── file_watcher.py            # watchdog-based file change monitor
-│       ├── git_pipeline.py            # GitPython commit/diff/branch reader
-│       ├── code_structure_analyzer.py # General-purpose AST/structure analyzer
-│       ├── style_fingerprint.py       # AST-based style analyzer
-│       ├── ingestion_coordinator.py   # Pipeline coordinator → calls v0.1 API
-│       └── watch_daemon.py            # Runnable entry point — watcher → coordinator
-│   └── orchestrator/                  # v0.3 — Executive Orchestrator Engine
-│       ├── __init__.py                # Re-exports all v0.3 public symbols
-│       ├── departments.py             # Department enum + sandbox configs
-│       ├── task_contract.py           # Pydantic TaskContract + RouterResult
-│       ├── model_gateway.py           # Ollama phi3:mini caller
-│       └── router.py                  # Non-generating ClassificationRouter
-│   └── sandbox/                       # v0.4 — Safe Action Sandbox
-│       ├── __init__.py                # Re-exports all v0.4 public symbols
-│       ├── models.py                  # ExecutionResult and ValidationScores
-│       ├── container.py               # Ephemeral Docker Sandbox controller
-│       ├── execution_loop.py          # SandboxCheckLoop compiler test injector
-│       └── validation_gate.py         # Multi-factor governance math & quarantine
-│   └── strategic_wing/                # v0.5 — FirstMinds Strategic Wing
-│       ├── __init__.py                # Re-exports all v0.5 public symbols
-│       ├── decision_journal.py        # Writes strategic decisions to Stream D
-│       └── workflow_monitor.py        # In-flight task state aggregation
-├── tests/
-│   ├── __init__.py
-│   ├── test_launcher.py               # Start/stop component loop proofs
-│   ├── test_phase_v01_gate.py         # Hard gate: v0.1 isolation + chunking + embed
-│   ├── test_memory_isolation.py       # Mock-assertion isolation / embed contract tests
-│   ├── test_metadata_and_chunking.py  # Metadata + chunking contract tests
-│   ├── test_phase_v02_gate.py         # Hard gate: v0.2 watcher + git + style + ingestion
-│   ├── test_phase_v03_gate.py         # Hard gate: v0.3 router + schema boundaries
-│   ├── test_phase_v04_gate.py         # Hard gate: v0.4 math governance + docker isolation
-│   └── test_phase_v05_gate.py         # Hard gate: v0.5 strategic wing tools
-├── memory/
-│   └── ambiguity_quarantine/          # Spec-defined quarantine dir (Phase v0.4 feature)
-│       └── .gitkeep
-├── project_context/
-│   ├── PROJECT_BRIEF.md
-│   └── ABM_SPEC.md
-├── interfaces.md                      # This file
-├── requirements.txt
-└── README.md
+â”œâ”€â”€ abm/
+â”‚   â”œâ”€â”€ __init__.py                    # Package root â€” version and phase metadata
+â”‚   â”œâ”€â”€ launcher.py                    # Unified entry point for background threads
+â”‚   â”œâ”€â”€ api/                           # API Layer
+â”‚   â”‚   â””â”€â”€ core/
+â”‚   â”‚       â”œâ”€â”€ config.py
+â”‚   â”‚       â”œâ”€â”€ interfaces.py          # Abstract interfaces for swappable services
+â”‚   â”‚       â””â”€â”€ registry.py            # ServiceRegistry container
+â”‚   â”œâ”€â”€ memory/                        # v0.1 â€” sealed, do not modify
+â”‚   â”‚   â”œâ”€â”€ __init__.py                # Re-exports all v0.1 public symbols
+â”‚   â”‚   â”œâ”€â”€ chroma_controller.py       # ChromaDB collection manager
+â”‚   â”‚   â”œâ”€â”€ embedding_wrapper.py       # Ollama nomic-embed-text connector
+â”‚   â”‚   â”œâ”€â”€ chunking.py                # Stream A/B/C chunking helpers
+â”‚   â”‚   â””â”€â”€ metadata_models.py         # Pydantic metadata validators
+â”‚   â””â”€â”€ companion/                     # v0.2 â€” Developer Companion Node
+â”‚       â”œâ”€â”€ __init__.py                # Re-exports all v0.2 public symbols
+â”‚       â”œâ”€â”€ file_watcher.py            # watchdog-based file change monitor
+â”‚       â”œâ”€â”€ git_pipeline.py            # GitPython commit/diff/branch reader
+â”‚       â”œâ”€â”€ code_structure_analyzer.py # General-purpose AST/structure analyzer
+â”‚       â”œâ”€â”€ style_fingerprint.py       # AST-based style analyzer
+â”‚       â”œâ”€â”€ ingestion_coordinator.py   # Pipeline coordinator â†’ calls v0.1 API
+â”‚       â””â”€â”€ watch_daemon.py            # Runnable entry point â€” watcher â†’ coordinator
+â”‚   â””â”€â”€ orchestrator/                  # v0.3 â€” Executive Orchestrator Engine
+â”‚       â”œâ”€â”€ __init__.py                # Re-exports all v0.3 public symbols
+â”‚       â”œâ”€â”€ departments.py             # Department enum + sandbox configs
+â”‚       â”œâ”€â”€ task_contract.py           # Pydantic TaskContract + RouterResult
+â”‚       â”œâ”€â”€ model_gateway.py           # Ollama qwen2.5-coder:3b caller
+â”‚       â””â”€â”€ router.py                  # Non-generating ClassificationRouter
+â”‚   â””â”€â”€ sandbox/                       # v0.4 â€” Safe Action Sandbox
+â”‚       â”œâ”€â”€ __init__.py                # Re-exports all v0.4 public symbols
+â”‚       â”œâ”€â”€ models.py                  # ExecutionResult and ValidationScores
+â”‚       â”œâ”€â”€ container.py               # Ephemeral Docker Sandbox controller
+â”‚       â”œâ”€â”€ execution_loop.py          # SandboxCheckLoop compiler test injector
+â”‚       â””â”€â”€ validation_gate.py         # Multi-factor governance math & quarantine
+â”‚   â””â”€â”€ strategic_wing/                # v0.5 â€” FirstMinds Strategic Wing
+â”‚       â”œâ”€â”€ __init__.py                # Re-exports all v0.5 public symbols
+â”‚       â”œâ”€â”€ decision_journal.py        # Writes strategic decisions to Stream D
+â”‚       â””â”€â”€ workflow_monitor.py        # In-flight task state aggregation
+â”œâ”€â”€ tests/
+â”‚   â”œâ”€â”€ __init__.py
+â”‚   â”œâ”€â”€ test_launcher.py               # Start/stop component loop proofs
+â”‚   â”œâ”€â”€ test_phase_v01_gate.py         # Hard gate: v0.1 isolation + chunking + embed
+â”‚   â”œâ”€â”€ test_memory_isolation.py       # Mock-assertion isolation / embed contract tests
+â”‚   â”œâ”€â”€ test_metadata_and_chunking.py  # Metadata + chunking contract tests
+â”‚   â”œâ”€â”€ test_phase_v02_gate.py         # Hard gate: v0.2 watcher + git + style + ingestion
+â”‚   â”œâ”€â”€ test_phase_v03_gate.py         # Hard gate: v0.3 router + schema boundaries
+â”‚   â”œâ”€â”€ test_phase_v04_gate.py         # Hard gate: v0.4 math governance + docker isolation
+â”‚   â””â”€â”€ test_phase_v05_gate.py         # Hard gate: v0.5 strategic wing tools
+â”œâ”€â”€ memory/
+â”‚   â””â”€â”€ ambiguity_quarantine/          # Spec-defined quarantine dir (Phase v0.4 feature)
+â”‚       â””â”€â”€ .gitkeep
+â”œâ”€â”€ project_context/
+â”‚   â”œâ”€â”€ PROJECT_BRIEF.md
+â”‚   â””â”€â”€ ABM_SPEC.md
+â”œâ”€â”€ interfaces.md                      # This file
+â”œâ”€â”€ requirements.txt
+â””â”€â”€ README.md
 ```
 
 ---
@@ -151,7 +151,7 @@ from abm.memory.chroma_controller import (
 
 Verbatim from ABM_SPEC.md section 3. Field names are NOT renamed.
 
-### Stream D — `abm_cognitive_identity`
+### Stream D â€” `abm_cognitive_identity`
 
 ```python
 SCHEMA_COGNITIVE_IDENTITY: dict[str, str] = {
@@ -162,13 +162,13 @@ SCHEMA_COGNITIVE_IDENTITY: dict[str, str] = {
 ```
 
 **Field descriptions:**
-- `owner` — Always `"ABM"`. Identifies the cognitive identity owner.
-- `target_entity` — Always `"FirstMinds"`. The corporate entity this stream serves.
-- `volatility` — Always `"immutable"`. Identity foundations do not change frequently.
+- `owner` â€” Always `"ABM"`. Identifies the cognitive identity owner.
+- `target_entity` â€” Always `"FirstMinds"`. The corporate entity this stream serves.
+- `volatility` â€” Always `"immutable"`. Identity foundations do not change frequently.
 
 ---
 
-### Stream A — `abm_code_topologies`
+### Stream A â€” `abm_code_topologies`
 
 ```python
 SCHEMA_CODE_TOPOLOGIES: dict[str, str] = {
@@ -180,16 +180,16 @@ SCHEMA_CODE_TOPOLOGIES: dict[str, str] = {
 ```
 
 **Field descriptions:**
-- `language` — Target language of the code chunk. Enum: `dart`, `kotlin`, `python` (plus `javascript`, `css`, `html`, `java` per spec section 3).
-- `framework` — Always `"flutter"` for cross-platform architecture targets.
-- `state_pattern` — Always `"bloc"` (Business Logic Component pattern).
-- `naming_convention` — Always `"camelCase"` per the spec.
+- `language` â€” Target language of the code chunk. Enum: `dart`, `kotlin`, `python` (plus `javascript`, `css`, `html`, `java` per spec section 3).
+- `framework` â€” Always `"flutter"` for cross-platform architecture targets.
+- `state_pattern` â€” Always `"bloc"` (Business Logic Component pattern).
+- `naming_convention` â€” Always `"camelCase"` per the spec.
 
 **Chunking strategy:** AST node clusters, class boundaries, or closing bracket parameters. Code is never split mid-line.
 
 ---
 
-### Stream B — `abm_technical_mastery`
+### Stream B â€” `abm_technical_mastery`
 
 ```python
 SCHEMA_TECHNICAL_MASTERY: dict[str, str] = {
@@ -200,15 +200,15 @@ SCHEMA_TECHNICAL_MASTERY: dict[str, str] = {
 ```
 
 **Field descriptions:**
-- `source` — Origin of the technical asset. Enum: `duckduckgo_sandbox`, `docs_fetch`.
-- `date_acquired` — ISO 8601 date string when the asset was acquired.
-- `confidence_score` — String-encoded float `[0.0, 1.0]` representing validation confidence.
+- `source` â€” Origin of the technical asset. Enum: `duckduckgo_sandbox`, `docs_fetch`.
+- `date_acquired` â€” ISO 8601 date string when the asset was acquired.
+- `confidence_score` â€” String-encoded float `[0.0, 1.0]` representing validation confidence.
 
-**Chunking strategy:** Recursive token chunking — 500-token window, 50-token overlap.
+**Chunking strategy:** Recursive token chunking â€” 500-token window, 50-token overlap.
 
 ---
 
-### Stream C — `abm_ambient_telemetry`
+### Stream C â€” `abm_ambient_telemetry`
 
 ```python
 SCHEMA_AMBIENT_TELEMETRY: dict[str, Any] = {
@@ -219,9 +219,9 @@ SCHEMA_AMBIENT_TELEMETRY: dict[str, Any] = {
 ```
 
 **Field descriptions:**
-- `epoch_timestamp` — Unix timestamp (integer) of the interaction event.
-- `active_repository` — Name of the Git repository active at event time.
-- `device_source` — Hardware source identifier. Uses `"dynamic_mobile_node"` per the spec's hardware-agnostic blueprint update (spec section 10 addendum). Not hardcoded to any specific device.
+- `epoch_timestamp` â€” Unix timestamp (integer) of the interaction event.
+- `active_repository` â€” Name of the Git repository active at event time.
+- `device_source` â€” Hardware source identifier. Uses `"dynamic_mobile_node"` per the spec's hardware-agnostic blueprint update (spec section 10 addendum). Not hardcoded to any specific device.
 
 **Chunking strategy:** Chronological windowing. Events grouped; blocks split on 120-second interaction pauses.
 
@@ -269,8 +269,8 @@ class ChromaController:
 ```
 
 **Parameters:**
-- `persist_directory` — Filesystem path for ChromaDB persistence. Default: `"./memory/chroma_store"`.
-- `in_memory` — If `True`, uses ephemeral EphemeralClient (for testing). Overrides `persist_directory`.
+- `persist_directory` â€” Filesystem path for ChromaDB persistence. Default: `"./memory/chroma_store"`.
+- `in_memory` â€” If `True`, uses ephemeral EphemeralClient (for testing). Overrides `persist_directory`.
 
 ---
 
@@ -281,7 +281,7 @@ def initialize_collections(self) -> None
 ```
 
 Creates or retrieves all four spec-defined ChromaDB collections.
-Idempotent — safe to call multiple times. Called automatically by `__init__`.
+Idempotent â€” safe to call multiple times. Called automatically by `__init__`.
 
 **Raises:** `RuntimeError` if ChromaDB fails to create any collection.
 
@@ -296,7 +296,7 @@ def get_collection(self, collection_name: str) -> chromadb.Collection
 Returns the ChromaDB `Collection` handle for the given name.
 
 **Parameters:**
-- `collection_name` — Must be one of the four `COLLECTION_*` constants.
+- `collection_name` â€” Must be one of the four `COLLECTION_*` constants.
 
 **Returns:** `chromadb.Collection`
 
@@ -318,14 +318,14 @@ def add_document(
 ```
 
 Adds a single document with a pre-computed embedding to the named collection.
-Collection is resolved by name **before** the write — zero crossover is guaranteed at the API boundary.
+Collection is resolved by name **before** the write â€” zero crossover is guaranteed at the API boundary.
 
 **Parameters:**
-- `collection_name` — Target collection. Must be one of the four canonical names.
-- `doc_id` — Unique document identifier (ChromaDB `id`).
-- `text` — Raw document text.
-- `metadata` — Document metadata conforming to the collection's canonical schema.
-- `embedding` — Pre-computed vector from `OllamaEmbeddingWrapper.embed()`.
+- `collection_name` â€” Target collection. Must be one of the four canonical names.
+- `doc_id` â€” Unique document identifier (ChromaDB `id`).
+- `text` â€” Raw document text.
+- `metadata` â€” Document metadata conforming to the collection's canonical schema.
+- `embedding` â€” Pre-computed vector from `OllamaEmbeddingWrapper.embed()`.
 
 **Raises:** `ValueError` for invalid collection name; `RuntimeError` on ChromaDB failure.
 
@@ -345,9 +345,9 @@ def query_collection(
 Performs nearest-neighbour vector query against the named collection only.
 
 **Parameters:**
-- `collection_name` — Target collection. Must be one of the four canonical names.
-- `query_embedding` — Query vector from `OllamaEmbeddingWrapper.embed()`.
-- `n_results` — Max results to return. Automatically clamped to collection size.
+- `collection_name` â€” Target collection. Must be one of the four canonical names.
+- `query_embedding` â€” Query vector from `OllamaEmbeddingWrapper.embed()`.
+- `n_results` â€” Max results to return. Automatically clamped to collection size.
 
 **Returns:** `QueryResult` dataclass (empty if collection has no data).
 
@@ -426,10 +426,10 @@ class OllamaEmbeddingWrapper:
 ```
 
 **Parameters:**
-- `base_url` — Ollama server URL. **Never change in production.** Always `127.0.0.1:11434`.
-- `model` — Ollama model name. Default: `"nomic-embed-text"`.
-- `connect_timeout` — TCP connect timeout (seconds).
-- `read_timeout` — HTTP response read timeout (seconds).
+- `base_url` â€” Ollama server URL. **Never change in production.** Always `127.0.0.1:11434`.
+- `model` â€” Ollama model name. Default: `"nomic-embed-text"`.
+- `connect_timeout` â€” TCP connect timeout (seconds).
+- `read_timeout` â€” HTTP response read timeout (seconds).
 
 ---
 
@@ -456,12 +456,12 @@ POSTs to `http://127.0.0.1:11434/api/embeddings` with body:
 { "model": "nomic-embed-text", "prompt": "<text>" }
 ```
 
-**Returns:** `list[float]` — the embedding vector (768 dims for nomic-embed-text).
+**Returns:** `list[float]` â€” the embedding vector (768 dims for nomic-embed-text).
 
 **Raises:**
-- `ValueError` — if `text` is empty or whitespace-only.
-- `ConnectionError` — if Ollama is not reachable at `127.0.0.1:11434`.
-- `RuntimeError` — if Ollama returns non-200 or malformed response.
+- `ValueError` â€” if `text` is empty or whitespace-only.
+- `ConnectionError` â€” if Ollama is not reachable at `127.0.0.1:11434`.
+- `RuntimeError` â€” if Ollama returns non-200 or malformed response.
 
 ---
 
@@ -473,7 +473,7 @@ def embed_batch(self, texts: list[str]) -> list[list[float]]
 
 Generates embeddings for a list of texts. Calls `embed()` once per text (Ollama API does not natively batch embeddings). Results are returned in the same order as input.
 
-**Returns:** `list[list[float]]` — one vector per input text.
+**Returns:** `list[list[float]]` â€” one vector per input text.
 
 **Raises:** `ValueError` if `texts` is empty; propagates all `embed()` errors.
 
@@ -675,7 +675,7 @@ All constants are module-level and importable for use in integration code and te
 | `SCHEMA_CODE_TOPOLOGIES` | `dict[str, str]` | Stream A metadata schema |
 | `SCHEMA_TECHNICAL_MASTERY` | `dict[str, str]` | Stream B metadata schema |
 | `SCHEMA_AMBIENT_TELEMETRY` | `dict[str, Any]` | Stream C metadata schema |
-| `COLLECTION_SCHEMAS` | `dict[str, dict]` | Maps each collection name → its schema |
+| `COLLECTION_SCHEMAS` | `dict[str, dict]` | Maps each collection name â†’ its schema |
 
 ### From `abm.memory.embedding_wrapper`
 
@@ -701,7 +701,7 @@ All constants are module-level and importable for use in integration code and te
 ## Test Suite
 
 **Files:**
-- [`tests/test_phase_v01_gate.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_phase_v01_gate.py) — **Phase v0.1 hard gate**
+- [`tests/test_phase_v01_gate.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_phase_v01_gate.py) â€” **Phase v0.1 hard gate**
 - [`tests/test_memory_isolation.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_memory_isolation.py)
 - [`tests/test_metadata_and_chunking.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_metadata_and_chunking.py)
 
@@ -739,7 +739,7 @@ python -m pytest tests/ -v
 | `TestMetadataModels` | Strict Pydantic validation for all four stream metadata schemas |
 | `TestStreamChunking` | Stream A AST/structural chunking, Stream B 500/50 token overlap, Stream C 120-second gap windows |
 
-Isolation gate uses real `ChromaController(in_memory=True)` (EphemeralClient). Embedding consistency mocks HTTP — **no live Ollama required.**
+Isolation gate uses real `ChromaController(in_memory=True)` (EphemeralClient). Embedding consistency mocks HTTP â€” **no live Ollama required.**
 
 ---
 
@@ -747,7 +747,7 @@ Isolation gate uses real `ChromaController(in_memory=True)` (EphemeralClient). E
 
 ---
 
-## Phase v0.2 — Developer Companion Node
+## Phase v0.2 â€” Developer Companion Node
 
 > [!IMPORTANT]
 > All v0.2 modules call into v0.1 through its **public API only**. No v0.1 file was modified.
@@ -769,7 +769,7 @@ Isolation gate uses real `ChromaController(in_memory=True)` (EphemeralClient). E
 | `EXCLUDED_DIRS` | `frozenset[str]` | See table below |
 | `EXCLUDED_EXTENSIONS` | `frozenset[str]` | See table below |
 
-#### `EXCLUDED_DIRS` — directory segments always ignored
+#### `EXCLUDED_DIRS` â€” directory segments always ignored
 
 Matched against **every component** of an incoming path (using `Path.parts`),
 so a segment anywhere in the tree (e.g. `deep/__pycache__/foo.pyc`) is
@@ -793,7 +793,7 @@ correctly excluded.
 | `.DS_Store` | macOS Finder metadata (dir form) |
 | `Thumbs.db` | Windows thumbnail cache (dir form) |
 
-#### `EXCLUDED_EXTENSIONS` — file suffixes always ignored
+#### `EXCLUDED_EXTENSIONS` â€” file suffixes always ignored
 
 Matched against `Path(path).suffix.lower()`.
 
@@ -807,7 +807,7 @@ Matched against `Path(path).suffix.lower()`.
 | `.o` | C/C++ object file |
 | `.class` | JVM bytecode |
 | `.log` | Log files (generated output) |
-| `.lock` | Lock files (e.g. `poetry.lock` — metadata, not source) |
+| `.lock` | Lock files (e.g. `poetry.lock` â€” metadata, not source) |
 | `.DS_Store` | macOS Finder metadata (file form) |
 | `.swp` / `.swo` | Vim swap files |
 | `.tmp` / `.bak` / `.orig` | Temporary / backup / merge artefacts |
@@ -821,9 +821,9 @@ class FileChangeEvent:
     event_type: str        # "created" | "modified" | "deleted"
     epoch_timestamp: int   # Unix timestamp (integer seconds) of detection
     repository: str        # Git repo name inferred from nearest .git parent ("" if none)
-    device_source: str     # Always "dynamic_mobile_node" — post_init set, do not pass
-    extension: str         # Lowercase file extension incl. leading dot — post_init derived
-    is_code_file: bool     # True if extension in CODE_EXTENSIONS — post_init derived
+    device_source: str     # Always "dynamic_mobile_node" â€” post_init set, do not pass
+    extension: str         # Lowercase file extension incl. leading dot â€” post_init derived
+    is_code_file: bool     # True if extension in CODE_EXTENSIONS â€” post_init derived
 ```
 
 `device_source`, `extension`, and `is_code_file` are set automatically in `__post_init__`.
@@ -847,10 +847,10 @@ class WorkspaceFileWatcher:
 ```
 
 **Parameters:**
-- `watch_paths` — List of absolute directory paths to monitor recursively. Must not be empty.
-- `on_code_change` — Callback fired when a code file changes (→ Stream A ingestion).
-- `on_telemetry_event` — Callback fired when a non-code file changes (→ Stream C ingestion).
-- `debounce_seconds` — Collapses rapid save storms into one event per file. Default `1.0`.
+- `watch_paths` â€” List of absolute directory paths to monitor recursively. Must not be empty.
+- `on_code_change` â€” Callback fired when a code file changes (â†’ Stream A ingestion).
+- `on_telemetry_event` â€” Callback fired when a non-code file changes (â†’ Stream C ingestion).
+- `debounce_seconds` â€” Collapses rapid save storms into one event per file. Default `1.0`.
 
 #### `start() -> None`
 Starts the watchdog Observer in a background daemon thread. Idempotent.
@@ -878,8 +878,8 @@ def _is_excluded(path: str) -> bool
 ```
 
 **Single authoritative exclusion gate.** Returns `True` if the path must be
-silently ignored. Called inside `_DebounceHandler._schedule()` — the earliest
-possible intercept point — so excluded paths:
+silently ignored. Called inside `_DebounceHandler._schedule()` â€” the earliest
+possible intercept point â€” so excluded paths:
 
 - never enter the debounce pending queue,
 - never trigger a debounce timer,
@@ -895,7 +895,7 @@ Dropped events are logged at `DEBUG` level:
 FileWatcher excluded (not ingested): <path>
 ```
 
-**Returns:** `True` → drop; `False` → proceed normally.
+**Returns:** `True` â†’ drop; `False` â†’ proceed normally.
 
 ### Internal: `_infer_repository(file_path: str) -> str`
 
@@ -932,7 +932,7 @@ Raised for any Git operation failure. Subclasses `RuntimeError`.
 @dataclass
 class CommitRecord:
     sha: str                    # Full 40-char commit SHA
-    message: str                # First line of commit message (≤200 chars)
+    message: str                # First line of commit message (â‰¤200 chars)
     author: str                 # Commit author name
     epoch_timestamp: int        # Unix timestamp (authored time)
     files_changed: list[str]    # Relative paths of all files touched
@@ -945,7 +945,7 @@ class CommitRecord:
 class FileDiff:
     path: str          # Relative file path within repository
     language: str      # Language detected from extension ("python"|"dart"|"kotlin")
-    added_lines: str   # All added lines joined — deletions excluded
+    added_lines: str   # All added lines joined â€” deletions excluded
 ```
 
 ### Class `GitPipeline`
@@ -992,11 +992,11 @@ def get_commit_file_chunks(self, commit_sha: str, language: str) -> list[str]
 ```
 
 Returns AST/structural code chunks for files matching `language` in a commit.
-**Calls `abm.memory.chunking.chunk_stream_a_code_topologies()` directly — not reimplemented.**
+**Calls `abm.memory.chunking.chunk_stream_a_code_topologies()` directly â€” not reimplemented.**
 
 **Parameters:**
-- `commit_sha` — Full or abbreviated commit SHA.
-- `language` — One of `"dart"`, `"kotlin"`, `"python"`.
+- `commit_sha` â€” Full or abbreviated commit SHA.
+- `language` â€” One of `"dart"`, `"kotlin"`, `"python"`.
 
 **Returns:** Flat `list[str]` of code chunks across all matching files.
 **Raises:** `GitPipelineError`; `ValueError` for unsupported language.
@@ -1140,18 +1140,18 @@ Uses `CodeStructureAnalyzer` for structural parsing, identifier frequency,
 formatting patterns, imports, and architecture signals.
 
 **Parameters:**
-- `code` — Non-empty source code to analyse.
-- `language` — One of `"dart"`, `"kotlin"`, `"python"`.
+- `code` â€” Non-empty source code to analyse.
+- `language` â€” One of `"dart"`, `"kotlin"`, `"python"`.
 
 **Raises:**
-- `StyleExtractionError` — if `code` is empty or whitespace-only.
-- `ValueError` — if `language` is not one of the three supported values.
+- `StyleExtractionError` â€” if `code` is empty or whitespace-only.
+- `ValueError` â€” if `language` is not one of the three supported values.
 
 **Detection logic:**
-- **Python** — uses `ast.parse()` for identifier extraction; falls back to regex on `SyntaxError`.
-- **Dart** — regex identifier extraction; BLoC/Flutter import patterns detected (`flutter_bloc`, `extends Bloc<`).
-- **Kotlin** — regex identifier extraction; returns `("flutter", "bloc")` defaults (project context).
-- **Naming convention** — counts camelCase (`[a-z]...[A-Z]...`) vs snake_case (`word_word`) identifiers. If `< MIN_IDENTIFIER_COUNT` multi-word identifiers found, defaults to `"camelCase"`.
+- **Python** â€” uses `ast.parse()` for identifier extraction; falls back to regex on `SyntaxError`.
+- **Dart** â€” regex identifier extraction; BLoC/Flutter import patterns detected (`flutter_bloc`, `extends Bloc<`).
+- **Kotlin** â€” regex identifier extraction; returns `("flutter", "bloc")` defaults (project context).
+- **Naming convention** â€” counts camelCase (`[a-z]...[A-Z]...`) vs snake_case (`word_word`) identifiers. If `< MIN_IDENTIFIER_COUNT` multi-word identifiers found, defaults to `"camelCase"`.
 
 #### `to_stream_a_metadata(fingerprint: StyleFingerprint) -> dict[str, str]`
 
@@ -1168,7 +1168,7 @@ Ready to pass directly to `ChromaController.add_document()`.
     "language": str,            # fingerprint.language
     "framework": str,           # fingerprint.framework
     "state_pattern": str,       # fingerprint.state_pattern
-    "naming_convention": "camelCase",  # always — Stream A schema Literal
+    "naming_convention": "camelCase",  # always â€” Stream A schema Literal
 }
 ```
 
@@ -1176,7 +1176,7 @@ Ready to pass directly to `ChromaController.add_document()`.
 > This dict contains **only** the four fields. No extra keys are ever added.
 > `naming_convention` is always `"camelCase"` (the only value accepted by
 > `CodeTopologiesMetadata`). Detected snake_case stays on the fingerprint
-> object and in `to_stream_a_document()` text — never in ChromaDB metadata.
+> object and in `to_stream_a_document()` text â€” never in ChromaDB metadata.
 > Validated against `SCHEMA_CODE_TOPOLOGIES` key set in the v0.2 regression gate.
 
 #### `to_stream_a_document(fingerprint: StyleFingerprint) -> str`
@@ -1202,7 +1202,7 @@ Formatting and architectural diagnostics are included in this text, not in metad
 
 | Constant | Type | Description |
 |----------|------|-------------|
-| `_EXT_TO_LANGUAGE` | `dict[str, str]` | Maps file extension → language string for ingestion routing |
+| `_EXT_TO_LANGUAGE` | `dict[str, str]` | Maps file extension â†’ language string for ingestion routing |
 
 ### Dataclass `IngestionResult`
 
@@ -1228,9 +1228,9 @@ class IngestionCoordinator:
 ```
 
 **Parameters:**
-- `controller` — The v0.1 `ChromaController`. **All ChromaDB writes go through this object.**
-- `embedder` — The v0.1 `OllamaEmbeddingWrapper`. All embeddings route to `127.0.0.1:11434`.
-- `git_pipeline` — Optional `GitPipeline`. If `None`, Git-based ingestion methods return skipped results.
+- `controller` â€” The v0.1 `ChromaController`. **All ChromaDB writes go through this object.**
+- `embedder` â€” The v0.1 `OllamaEmbeddingWrapper`. All embeddings route to `127.0.0.1:11434`.
+- `git_pipeline` â€” Optional `GitPipeline`. If `None`, Git-based ingestion methods return skipped results.
 
 #### `ingest_file_change(event: FileChangeEvent) -> IngestionResult`
 
@@ -1242,7 +1242,7 @@ Processes a `FileChangeEvent` from the file watcher.
 
 | Event condition | Action |
 |-----------------|--------|
-| `event_type == "deleted"` | Returns `status="skipped"` — nothing to embed |
+| `event_type == "deleted"` | Returns `status="skipped"` â€” nothing to embed |
 | `event.is_code_file == True` | Reads file, chunks via v0.1 `chunk_stream_a_code_topologies()`, fingerprints, embeds, writes to **Stream A**. Also writes file-change event to **Stream C**. |
 | `event.is_code_file == False` | Writes a single telemetry event to **Stream C** only. |
 
@@ -1274,7 +1274,7 @@ def ingest_git_commit(self, commit_sha: str, language: str) -> IngestionResult
 
 Ingests code from a single Git commit into Stream A and logs one telemetry event to Stream C.
 
-- Calls `GitPipeline.get_commit_file_chunks()` → which calls v0.1 `chunk_stream_a_code_topologies`.
+- Calls `GitPipeline.get_commit_file_chunks()` â†’ which calls v0.1 `chunk_stream_a_code_topologies`.
 - Each chunk is fingerprinted via `StyleFingerprintExtractor`, embedded, and written to **Stream A**.
 - One commit event is written to **Stream C** via `GitPipeline.get_commit_telemetry_event()`.
 - **Never writes to Stream B or D.**
@@ -1304,7 +1304,7 @@ def _doc_id(prefix: str, content: str) -> str
 ```
 
 Generates a stable, unique document ID from a sanitised prefix and the first 12 hex characters
-of a SHA-256 hash of `content`. Identical content always produces the same ID — makes
+of a SHA-256 hash of `content`. Identical content always produces the same ID â€” makes
 `add_document` calls **idempotent** (upsert behaviour).
 
 ---
@@ -1314,7 +1314,7 @@ of a SHA-256 hash of `content`. Identical content always produces the same ID �
 **File:** [`abm/companion/watch_daemon.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/companion/watch_daemon.py)
 
 Runnable entry point that wires `WorkspaceFileWatcher` directly to `IngestionCoordinator`.
-This is the only module in v0.2 that owns a daemon lifecycle — everything else is a library.
+This is the only module in v0.2 that owns a daemon lifecycle â€” everything else is a library.
 
 > [!IMPORTANT]
 > `watch_daemon` is **not** imported by `abm.companion.__init__`. It is an executable
@@ -1350,7 +1350,7 @@ def build_coordinator(
 ```
 
 Constructs the full v0.1+v0.2 object graph:
-`ChromaController` → `OllamaEmbeddingWrapper` → `GitPipeline` (optional) → `IngestionCoordinator`.
+`ChromaController` â†’ `OllamaEmbeddingWrapper` â†’ `GitPipeline` (optional) â†’ `IngestionCoordinator`.
 
 If `git_path` is provided but fails `GitPipeline` init, the warning is logged and the
 coordinator runs without Git support. File-change ingestion is unaffected.
@@ -1480,10 +1480,10 @@ All public v0.2 classes and dataclasses are re-exported at the package level.
 ## Test Suite
 
 **Files:**
-- [`tests/test_phase_v01_gate.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_phase_v01_gate.py) — **Phase v0.1 hard gate**
+- [`tests/test_phase_v01_gate.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_phase_v01_gate.py) â€” **Phase v0.1 hard gate**
 - [`tests/test_memory_isolation.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_memory_isolation.py)
 - [`tests/test_metadata_and_chunking.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_metadata_and_chunking.py)
-- [`tests/test_phase_v02_gate.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_phase_v02_gate.py) — **Phase v0.2 hard gate**
+- [`tests/test_phase_v02_gate.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/tests/test_phase_v02_gate.py) â€” **Phase v0.2 hard gate**
 
 **v0.2 gate only (must be 100% green before v0.3):**
 ```bash
@@ -1749,7 +1749,7 @@ python -m pytest tests/test_phase_v03_gate.py -v
 
 ---
 
-## Phase v0.4 — Safe Action Sandbox
+## Phase v0.4 â€” Safe Action Sandbox
 
 > [!IMPORTANT]
 > The sandbox modules manage isolated code execution in ephemeral Docker containers, enforcing the mathematical Validation Gate defined in spec section 6.
@@ -1888,7 +1888,7 @@ python -m pytest tests/test_phase_v04_gate.py -v
 | `TestSandboxIsolationTeardownGate` | Fresh container per run; stop+remove+close on exit; teardown on execute errors; `network_mode=none`; no shared write state across sequential `SandboxCheckLoop` runs |
 | `TestCompilerTestCheckRejectionGate` | Compile/test failures return non-zero `exit_code` (not rewritten to success); failed checks still tear down the sandbox |
 | `TestConfidenceFormulaExactGate` | `C = 0.30M+0.25T+0.20S+0.15Test+0.10P` exact across inputs; boundaries at `S=0.80`, `Test=0.90`, `C=0.85` (pass) and just-below (quarantine) |
-| `TestFloorBreachQuarantinesHighCGate` | `S_val < 0.80` or `Test_succ < 0.90` quarantines even when `C ≥ 0.85`; high-C with floors met is accepted |
+| `TestFloorBreachQuarantinesHighCGate` | `S_val < 0.80` or `Test_succ < 0.90` quarantines even when `C â‰¥ 0.85`; high-C with floors met is accepted |
 
 ### Supporting contract coverage
 
@@ -1901,10 +1901,10 @@ python -m pytest tests/test_phase_v04_gate.py -v
 
 ---
 
-## Phase v0.5 — FirstMinds Strategic Wing
+## Phase v0.5 â€” FirstMinds Strategic Wing
 
 > [!IMPORTANT]
-> The Strategic Wing modules track corporate decisions and aggregate workflow states. They strictly adhere to the rule of not modifying core v0.1–v0.4 functionality, relying purely on existing interfaces and data shapes.
+> The Strategic Wing modules track corporate decisions and aggregate workflow states. They strictly adhere to the rule of not modifying core v0.1â€“v0.4 functionality, relying purely on existing interfaces and data shapes.
 
 ---
 
@@ -2095,12 +2095,12 @@ python -m pytest tests/test_phase_v05_gate.py -v
 
 ---
 
-## Phase v1.0 — API Layer & Capability Catalogue
+## Phase v1.0 â€” API Layer & Capability Catalogue
 
 > [!IMPORTANT]
 > This section IS the capability catalogue. No separate deliverable exists.
 > Every capability the ABM engine exposes to any client is documented here with
-> its `STATUS`, `OWNER`, `DEPENDENCIES`, and `CONSUMERS` — the four fields that
+> its `STATUS`, `OWNER`, `DEPENDENCIES`, and `CONSUMERS` â€” the four fields that
 > make this a living contract (Architectural Constitution rules 13 and 14).
 
 ---
@@ -2109,22 +2109,22 @@ python -m pytest tests/test_phase_v05_gate.py -v
 
 ```
 ABM-2.0/
-├── abm/
-│   ├── api/                                  # v1.0 — API Layer
-│   │   ├── __init__.py                       # Re-exports full public surface
-│   │   ├── capabilities.py                   # All capabilities, status-tagged
-│   │   └── core/
-│   │       ├── __init__.py                   # Re-exports APIConfig, ServiceRegistry, HealthStatus
-│   │       ├── config.py                     # APIConfig dataclass
-│   │       └── registry.py                   # ServiceRegistry (boot/shutdown/health_check)
-│   └── clients/
-│       └── console/                          # v1.0 — Client #1: Console
-│           ├── __init__.py
-│           ├── commands.py                   # cmd_* handlers → API
-│           ├── formatter.py                  # Terminal output formatters
-│           └── main.py                       # CLI entry point (argparse)
-├── tests/
-│   └── test_phase_v10_gate.py               # Hard gate: API + console (49 tests)
+â”œâ”€â”€ abm/
+â”‚   â”œâ”€â”€ api/                                  # v1.0 â€” API Layer
+â”‚   â”‚   â”œâ”€â”€ __init__.py                       # Re-exports full public surface
+â”‚   â”‚   â”œâ”€â”€ capabilities.py                   # All capabilities, status-tagged
+â”‚   â”‚   â””â”€â”€ core/
+â”‚   â”‚       â”œâ”€â”€ __init__.py                   # Re-exports APIConfig, ServiceRegistry, HealthStatus
+â”‚   â”‚       â”œâ”€â”€ config.py                     # APIConfig dataclass
+â”‚   â”‚       â””â”€â”€ registry.py                   # ServiceRegistry (boot/shutdown/health_check)
+â”‚   â””â”€â”€ clients/
+â”‚       â””â”€â”€ console/                          # v1.0 â€” Client #1: Console
+â”‚           â”œâ”€â”€ __init__.py
+â”‚           â”œâ”€â”€ commands.py                   # cmd_* handlers â†’ API
+â”‚           â”œâ”€â”€ formatter.py                  # Terminal output formatters
+â”‚           â””â”€â”€ main.py                       # CLI entry point (argparse)
+â”œâ”€â”€ tests/
+â”‚   â””â”€â”€ test_phase_v10_gate.py               # Hard gate: API + console (49 tests)
 ```
 
 ---
@@ -2141,14 +2141,14 @@ class APIConfig:
     chroma_persist_directory: str = "./memory/chroma_store"
     ollama_base_url: str = "http://127.0.0.1:11434"
     embedding_model: str = "nomic-embed-text"
-    classification_model: str = "phi3:mini"
+    classification_model: str = "qwen2.5-coder:3b"
     quarantine_dir: str = "memory/ambiguity_quarantine"
     connect_timeout: float = 5.0
     read_timeout: float = 30.0
     n_retrieval_results: int = 5
 ```
 
-All defaults match the v0.1–v0.5 module constants. Create one instance at startup
+All defaults match the v0.1â€“v0.5 module constants. Create one instance at startup
 and pass it to `ServiceRegistry`. Do not mutate after boot.
 
 ---
@@ -2196,11 +2196,11 @@ class ServiceRegistry:
 1. `ChromaController` (v0.1)
 2. `OllamaEmbeddingWrapper` (v0.1)
 3. `OllamaModelGateway` (v0.3)
-4. `ClassificationRouter` (v0.3 — depends on gateway + controller + embedder)
+4. `ClassificationRouter` (v0.3 â€” depends on gateway + controller + embedder)
 5. `WorkflowMonitor` (v0.5)
 6. `StrategicAssetAnalyzer` (v0.5)
 
-**Design note:** This is NOT a formal DI/IoC container — that is an
+**Design note:** This is NOT a formal DI/IoC container â€” that is an
 ARCHITECTURE_BACKLOG candidate. This is plain shared-instance management with
 lifecycle discipline sufficient for the current single-client scope.
 
@@ -2212,7 +2212,7 @@ if Ollama is unreachable or ChromaDB is not ready. (Constitution rule 9.)
 config = APIConfig()
 registry = ServiceRegistry(config)
 registry.boot()
-# … use registry.router, registry.embedder, etc. …
+# â€¦ use registry.router, registry.embedder, etc. â€¦
 registry.shutdown()
 ```
 
@@ -2229,7 +2229,7 @@ registry.shutdown()
 
 | Tag | Meaning |
 |-----|---------|
-| `stable` | Tested, gated v0.1–v0.5 backend exists; wired to a console command now. |
+| `stable` | Tested, gated v0.1â€“v0.5 backend exists; wired to a console command now. |
 | `experimental` | Built but not yet wired to any client. (None today.) |
 | `future` | Documented stub only. `NotImplementedError`. Backend has no phase brief yet. |
 
@@ -2264,7 +2264,7 @@ class StatusResult:
 @dataclass
 class MemoryResult:
     project_name: str
-    streams: dict[str, list[dict]]   # collection_name → hits
+    streams: dict[str, list[dict]]   # collection_name â†’ hits
     total_hits: int
     degraded: bool
 
@@ -2278,9 +2278,9 @@ class ExplainResult:
 
 ---
 
-### ── STABLE Capabilities ────────────────────────────────────────────────────
+### â”€â”€ STABLE Capabilities â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
-#### `answerQuestion(question, *, registry, n_results=None) → AnswerResult`
+#### `answerQuestion(question, *, registry, n_results=None) â†’ AnswerResult`
 
 ```python
 def answerQuestion(
@@ -2303,7 +2303,7 @@ gracefully when Ollama is unreachable (`fallback_used=True`, empty hits,
 
 ---
 
-#### `retrieveKnowledge(query, *, registry, n_results=None) → KnowledgeResult`
+#### `retrieveKnowledge(query, *, registry, n_results=None) â†’ KnowledgeResult`
 
 ```python
 def retrieveKnowledge(
@@ -2324,7 +2324,7 @@ routing. Returns hits sorted by distance. Degrades gracefully on embed failure.
 
 ---
 
-#### `getSystemStatus(*, registry) → StatusResult`
+#### `getSystemStatus(*, registry) â†’ StatusResult`
 
 ```python
 def getSystemStatus(*, registry: ServiceRegistry) -> StatusResult
@@ -2340,7 +2340,7 @@ and `ServiceRegistry.health_check()`. Read-only. Never raises.
 
 ---
 
-#### `summarizeProject(project_name, *, registry, n_results_per_stream=3) → StrategicAnalysisResult`
+#### `summarizeProject(project_name, *, registry, n_results_per_stream=3) â†’ StrategicAnalysisResult`
 
 ```python
 def summarizeProject(
@@ -2353,7 +2353,7 @@ def summarizeProject(
 
 - **STATUS:** `stable`
 - **OWNER:** `abm.strategic_wing.strategic_asset_analyzer.StrategicAssetAnalyzer`
-- **DEPENDENCIES:** `ServiceRegistry.analyzer` (→ embedder + controller)
+- **DEPENDENCIES:** `ServiceRegistry.analyzer` (â†’ embedder + controller)
 - **CONSUMERS:** console `summarize` command
 
 Thin delegation to `StrategicAssetAnalyzer.analyze()`. Returns a
@@ -2363,7 +2363,7 @@ is unreachable (propagated from analyzer).
 
 ---
 
-#### `aggregateProjectMemory(project_name, *, registry, n_results=None) → MemoryResult`
+#### `aggregateProjectMemory(project_name, *, registry, n_results=None) â†’ MemoryResult`
 
 ```python
 def aggregateProjectMemory(
@@ -2380,12 +2380,12 @@ def aggregateProjectMemory(
 - **CONSUMERS:** console `memory` command
 
 Embeds the project name, queries all four streams independently, returns
-results grouped by collection name. A composed retrieval view — no new engine.
+results grouped by collection name. A composed retrieval view â€” no new engine.
 Degrades gracefully on embed failure.
 
 ---
 
-#### `explainAuditRecord(target, *, registry) → ExplainResult`
+#### `explainAuditRecord(target, *, registry) â†’ ExplainResult`
 
 ```python
 def explainAuditRecord(
@@ -2397,19 +2397,19 @@ def explainAuditRecord(
 
 - **STATUS:** `stable`
 - **OWNER:** `abm.strategic_wing.workflow_monitor.WorkflowMonitor` (source A),
-  `abm.memory.chroma_controller.ChromaController` (source B — Stream D)
+  `abm.memory.chroma_controller.ChromaController` (source B â€” Stream D)
 - **DEPENDENCIES:** `ServiceRegistry.monitor`, `ServiceRegistry.embedder`,
   `ServiceRegistry.controller`
 - **CONSUMERS:** console `explain` command
 
-Two audit sources consulted (constitution rule 5 — every action is auditable):
+Two audit sources consulted (constitution rule 5 â€” every action is auditable):
 
-**Source A — WorkflowMonitor (in-memory, live-session scope):**
+**Source A â€” WorkflowMonitor (in-memory, live-session scope):**
 Looks up `target` as a contract_id substring. Each found `TaskRecord` exposes:
 routing department, confidence_hint, task state, v0.4 gate scores
 (confidence_score, quarantine_flag), and execution result.
 
-**Source B — ChromaDB Stream D (persisted, cross-session):**
+**Source B â€” ChromaDB Stream D (persisted, cross-session):**
 Embeds `target` and queries `abm_cognitive_identity` for
 `STRATEGIC DECISION RECORD` entries written by `DecisionJournal.log_decision()`.
 
@@ -2417,7 +2417,7 @@ Both sources are searched and combined in the result. Never raises.
 
 ---
 
-### ── FUTURE Capabilities (stubs) ─────────────────────────────────────────────
+### â”€â”€ FUTURE Capabilities (stubs) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 Each raises `NotImplementedError`. A console command may only be added the day
 its backend phase is fully gated. See `ARCHITECTURE_BACKLOG.md` and
@@ -2425,10 +2425,10 @@ its backend phase is fully gated. See `ARCHITECTURE_BACKLOG.md` and
 
 | Function | STATUS | Why deferred |
 |----------|--------|--------------|
-| `continueTask(task_id, *, registry)` | `future` | Requires session-state / task-continuation engine — not designed anywhere in roadmap |
-| `reflectOnWork(*, registry)` | `future` | Requires reflection engine — does not exist in any `ABM_SPEC.md` phase |
-| `planProject(project, *, registry)` | `future` | Requires planning agent — does not exist |
-| `learnTopic(topic, *, registry)` | `future` | Requires autonomous research-task queue — does not exist |
+| `continueTask(task_id, *, registry)` | `future` | Requires session-state / task-continuation engine â€” not designed anywhere in roadmap |
+| `reflectOnWork(*, registry)` | `future` | Requires reflection engine â€” does not exist in any `ABM_SPEC.md` phase |
+| `planProject(project, *, registry)` | `future` | Requires planning agent â€” does not exist |
+| `learnTopic(topic, *, registry)` | `future` | Requires autonomous research-task queue â€” does not exist |
 
 ---
 
@@ -2450,18 +2450,18 @@ from abm.api import (
 )
 ```
 
-All clients import from `abm.api` only — never from `abm.api.core` or
+All clients import from `abm.api` only â€” never from `abm.api.core` or
 `abm.api.capabilities` directly.
 
 ---
 
-## Phase v1.0 — Console Client (#1)
+## Phase v1.0 â€” Console Client (#1)
 
 ### Module: `abm.clients.console.commands`
 
 **File:** [`abm/clients/console/commands.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/clients/console/commands.py)
 
-Six command handlers. Each accepts plain Python scalars + `registry` keyword
+Seven command handlers. Each accepts plain Python scalars + `registry` keyword
 arg, calls one API capability, passes the result to a formatter.
 
 ```python
@@ -2471,12 +2471,13 @@ def cmd_status(*, registry: ServiceRegistry) -> str
 def cmd_summarize(project: str, *, registry: ServiceRegistry) -> str
 def cmd_memory(project: str, *, registry: ServiceRegistry) -> str
 def cmd_explain(target: str, *, registry: ServiceRegistry) -> str
+def cmd_ingest(path: str, *, registry: ServiceRegistry) -> str
 ```
 
 **Invariants:**
 - No `cmd_*` function imports from `abm.memory`, `abm.orchestrator`,
   `abm.companion`, `abm.sandbox`, or `abm.strategic_wing` directly.
-- `cmd_continue`, `cmd_reflect`, `cmd_plan`, `cmd_learn` do NOT exist —
+- `cmd_continue`, `cmd_reflect`, `cmd_plan`, `cmd_learn` do NOT exist â€”
   no backend engine is built for them.
 
 ---
@@ -2492,6 +2493,7 @@ def format_status(result: StatusResult) -> str
 def format_summarize(result: StrategicAnalysisResult) -> str
 def format_memory(result: MemoryResult) -> str
 def format_explain(result: ExplainResult) -> str
+def format_ingest(result: IngestResult) -> str
 ```
 
 Zero cognitive logic. Converts API result types to terminal output with
@@ -2506,18 +2508,25 @@ relevance bars, stream labels, snippet truncation, and degraded warnings.
 CLI entry point. Usage:
 
 ```bash
+# REPL mode (interactive shell)
+python -m abm.clients.console.main
+
+# One-shot mode
 python -m abm.clients.console.main ask "what is ABM?"
 python -m abm.clients.console.main search "BLoC pattern"
 python -m abm.clients.console.main status
 python -m abm.clients.console.main summarize smart_transit
 python -m abm.clients.console.main memory houseconnect
 python -m abm.clients.console.main explain TXN_12345
+python -m abm.clients.console.main ingest /path/to/doc.pdf
 python -m abm.clients.console.main --verbose ask "..."
 python -m abm.clients.console.main --chroma-dir /path/to/db status
 ```
 
-Boot sequence: parse args → `APIConfig()` → `ServiceRegistry.boot()` →
-dispatch to `cmd_*` → print → `ServiceRegistry.shutdown()`.
+Boot sequence (One-shot): parse args â†’ `APIConfig()` â†’ `ServiceRegistry.boot()` â†’
+dispatch to `cmd_*` â†’ print â†’ `ServiceRegistry.shutdown()`.
+
+Boot sequence (REPL): `APIConfig()` â†’ `ServiceRegistry.boot()` â†’ loop(input â†’ parse â†’ dispatch) â†’ `ServiceRegistry.shutdown()`.
 
 Exits `0` on success, `1` on error, `130` on `KeyboardInterrupt`.
 
@@ -2537,27 +2546,27 @@ python -m pytest tests/test_phase_v10_gate.py -v
 python -m pytest tests/ -v
 ```
 
-### Hard gate proofs (49 tests — all mocked, no live Ollama required)
+### Hard gate proofs (49 tests â€” all mocked, no live Ollama required)
 
 | Class | Proves |
 |-------|--------|
 | `TestAPILayerStructureGate` | Six stable capabilities exist; four future stubs raise `NotImplementedError`; no module-leaking names; return types are typed dataclasses not raw ChromaDB types |
 | `TestCapabilityStatusTagsGate` | Every stable capability tagged `stable`; every future stub tagged `future`; all stable capabilities declare OWNER, DEPENDENCIES, CONSUMERS |
-| `TestServiceRegistryLifecycleGate` | Accessing services before boot raises; shutdown is idempotent; double boot is a warning not an error; health_check never raises; APIConfig defaults match v0.1–v0.5 constants |
+| `TestServiceRegistryLifecycleGate` | Accessing services before boot raises; shutdown is idempotent; double boot is a warning not an error; health_check never raises; APIConfig defaults match v0.1â€“v0.5 constants |
 | `TestConsoleCommandsOnlyStableGate` | Exactly six `cmd_*` functions exist; four deferred commands absent; commands.py imports only through `abm.api`; all commands accept `registry` keyword |
 | `TestAPICapabilityContractGate` | Each capability delegates to correct backend; returns correct typed result; degrades gracefully (never raises) when Ollama is unavailable |
-| `TestPriorPhaseRegressionGate` | v0.1–v0.5 collection names, department enum values, task state values, validation formula weights, and API config Ollama URL are all unchanged |
+| `TestPriorPhaseRegressionGate` | v0.1â€“v0.5 collection names, department enum values, task state values, validation formula weights, and API config Ollama URL are all unchanged |
 
 *Updated for ABM 2.0 Phase v1.0. Update this file whenever new capabilities or schemas are added.*
 
 ---
 
-## Phase v1.0 — Flutter Foreground Service & Ambient Interaction Manager
+## Phase v1.0 â€” Flutter Foreground Service & Ambient Interaction Manager
 
 > [!IMPORTANT]
 > This phase adds the ABM mobile node (Flutter/Android) and the Python-side
 > ambient interaction manager that feeds Stream C with retention-aware writes.
-> All v0.1–v0.5 modules are sealed and unchanged (PROJECT_BRIEF.md ground rule 2).
+> All v0.1â€“v0.5 modules are sealed and unchanged (PROJECT_BRIEF.md ground rule 2).
 
 ---
 
@@ -2565,35 +2574,35 @@ python -m pytest tests/ -v
 
 ```
 ABM-2.0/
-├── abm/
-│   ├── mobile/                                 # v1.0 — Ambient Interaction
-│   │   ├── __init__.py                         # Re-exports full public surface
-│   │   ├── event_models.py                     # AmbientEvent dataclass + PERMITTED_SOURCE_KINDS
-│   │   ├── stream_c_writer.py                  # StreamCWriter (retention-aware write path)
-│   │   ├── retention_housekeeper.py            # StreamCRetentionHousekeeper + lifecycle stages
-│   │   └── ambient_manager.py                  # AmbientInteractionManager + 3 sub-monitors
-│   └── api/
-│       ├── capabilities.py                     # + AmbientIngestionResult + ingestAmbientEvent
-│       ├── __init__.py                         # + re-exports for new symbols
-│       └── core/
-│           └── registry.py                     # + ambient_manager property (boot step 7)
-├── mobile/                                     # v1.0 — Flutter Mobile Node
-│   ├── pubspec.yaml
-│   ├── android/app/src/main/AndroidManifest.xml
-│   └── lib/
-│       ├── main.dart                           # Entry point + foreground task callback registration
-│       ├── app.dart                            # MultiBlocProvider root + dark Material 3 theme
-│       └── features/
-│           ├── foreground/
-│           │   ├── bloc/                       # ForegroundBloc + events + states
-│           │   ├── service/abm_foreground_service.dart
-│           │   └── ui/foreground_status_widget.dart
-│           └── telemetry/
-│               ├── bloc/                       # TelemetryBloc + events + states
-│               ├── models/ambient_event_model.dart
-│               └── repository/telemetry_repository.dart
-└── tests/
-    └── test_phase_v10_mobile_gate.py           # 48-test gate (all mocked)
+â”œâ”€â”€ abm/
+â”‚   â”œâ”€â”€ mobile/                                 # v1.0 â€” Ambient Interaction
+â”‚   â”‚   â”œâ”€â”€ __init__.py                         # Re-exports full public surface
+â”‚   â”‚   â”œâ”€â”€ event_models.py                     # AmbientEvent dataclass + PERMITTED_SOURCE_KINDS
+â”‚   â”‚   â”œâ”€â”€ stream_c_writer.py                  # StreamCWriter (retention-aware write path)
+â”‚   â”‚   â”œâ”€â”€ retention_housekeeper.py            # StreamCRetentionHousekeeper + lifecycle stages
+â”‚   â”‚   â””â”€â”€ ambient_manager.py                  # AmbientInteractionManager + 3 sub-monitors
+â”‚   â””â”€â”€ api/
+â”‚       â”œâ”€â”€ capabilities.py                     # + AmbientIngestionResult + ingestAmbientEvent
+â”‚       â”œâ”€â”€ __init__.py                         # + re-exports for new symbols
+â”‚       â””â”€â”€ core/
+â”‚           â””â”€â”€ registry.py                     # + ambient_manager property (boot step 7)
+â”œâ”€â”€ mobile/                                     # v1.0 â€” Flutter Mobile Node
+â”‚   â”œâ”€â”€ pubspec.yaml
+â”‚   â”œâ”€â”€ android/app/src/main/AndroidManifest.xml
+â”‚   â””â”€â”€ lib/
+â”‚       â”œâ”€â”€ main.dart                           # Entry point + foreground task callback registration
+â”‚       â”œâ”€â”€ app.dart                            # MultiBlocProvider root + dark Material 3 theme
+â”‚       â””â”€â”€ features/
+â”‚           â”œâ”€â”€ foreground/
+â”‚           â”‚   â”œâ”€â”€ bloc/                       # ForegroundBloc + events + states
+â”‚           â”‚   â”œâ”€â”€ service/abm_foreground_service.dart
+â”‚           â”‚   â””â”€â”€ ui/foreground_status_widget.dart
+â”‚           â””â”€â”€ telemetry/
+â”‚               â”œâ”€â”€ bloc/                       # TelemetryBloc + events + states
+â”‚               â”œâ”€â”€ models/ambient_event_model.dart
+â”‚               â””â”€â”€ repository/telemetry_repository.dart
+â””â”€â”€ tests/
+    â””â”€â”€ test_phase_v10_mobile_gate.py           # 48-test gate (all mocked)
 ```
 
 ---
@@ -2613,7 +2622,7 @@ PERMITTED_SOURCE_KINDS: frozenset[str] = frozenset({
 ```
 
 Exhaustive set of permitted ambient telemetry source kinds for Phase v1.0.
-Clipboard, voice, and browser are structurally absent — not runtime-gated.
+Clipboard, voice, and browser are structurally absent â€” not runtime-gated.
 
 ### Dataclass `AmbientEvent`
 
@@ -2629,7 +2638,7 @@ class AmbientEvent:
     extra: dict                # Optional diagnostics; never written to ChromaDB
 ```
 
-`__post_init__` raises `ValueError` if `source_kind ∉ PERMITTED_SOURCE_KINDS` or `text` is empty/whitespace.
+`__post_init__` raises `ValueError` if `source_kind âˆ‰ PERMITTED_SOURCE_KINDS` or `text` is empty/whitespace.
 `device_source` is always `"dynamic_mobile_node"` regardless of any kwarg.
 
 ---
@@ -2676,11 +2685,11 @@ class StreamCWriter:
 
 | Stage | What |
 |-------|------|
-| 1 Capture | Receives `AmbientEvent`; checks `source_kind ∈ PERMITTED_SOURCE_KINDS` |
+| 1 Capture | Receives `AmbientEvent`; checks `source_kind âˆˆ PERMITTED_SOURCE_KINDS` |
 | 2 Validate | Inline type checks on `epoch_timestamp`, `active_repository`, `device_source` |
-| 3 Compress | Dedup gate: `(source_kind, active_repository, sha256(text)[:16])` within `compress_window_seconds` → `"compressed"` |
+| 3 Compress | Dedup gate: `(source_kind, active_repository, sha256(text)[:16])` within `compress_window_seconds` â†’ `"compressed"` |
 | 4 Store | Calls `ChromaController.add_document()` with **exactly 3 metadata fields**: `epoch_timestamp`, `active_repository`, `device_source` |
-| 5–7 Housekeeping | Calls `StreamCRetentionHousekeeper.run_if_due()` (rate-limited to once/hour) |
+| 5â€“7 Housekeeping | Calls `StreamCRetentionHousekeeper.run_if_due()` (rate-limited to once/hour) |
 
 **Metadata contract:** ChromaDB metadata written by `StreamCWriter` contains
 exactly `{epoch_timestamp, active_repository, device_source}`.  Extra diagnostic
@@ -2722,7 +2731,7 @@ class HousekeeperResult:
 
 ### Class `StreamCRetentionHousekeeper`
 
-Implements MEMORY_LIFECYCLE_POLICY.md lifecycle stages 5–7 for Stream C.
+Implements MEMORY_LIFECYCLE_POLICY.md lifecycle stages 5â€“7 for Stream C.
 
 ```python
 class StreamCRetentionHousekeeper:
@@ -2742,9 +2751,9 @@ class StreamCRetentionHousekeeper:
 
 | Stage | Trigger | Action |
 |-------|---------|--------|
-| 5 Summarize | Entry age ≥ `SUMMARIZE_AFTER_DAYS` (14d) with `lifecycle_stage="raw"` | Write summary doc to Stream C; mark originals `lifecycle_stage="summarized"` |
-| 6 Archive | Entry age ≥ `ARCHIVE_AFTER_DAYS` (30d) with `lifecycle_stage="summarized"` | Write to `abm_ambient_telemetry_archive` (separate `ArchiveController`); delete from hot-path |
-| 7 Delete | Entry age ≥ `DELETE_AFTER_DAYS` (180d) with any raw stage | Hard-delete from hot-path; summary retained |
+| 5 Summarize | Entry age â‰¥ `SUMMARIZE_AFTER_DAYS` (14d) with `lifecycle_stage="raw"` | Write summary doc to Stream C; mark originals `lifecycle_stage="summarized"` |
+| 6 Archive | Entry age â‰¥ `ARCHIVE_AFTER_DAYS` (30d) with `lifecycle_stage="summarized"` | Write to `abm_ambient_telemetry_archive` (separate `ArchiveController`); delete from hot-path |
+| 7 Delete | Entry age â‰¥ `DELETE_AFTER_DAYS` (180d) with any raw stage | Hard-delete from hot-path; summary retained |
 
 **Cold archive:** Uses a **separate `ChromaController` instance** pointing to
 `archive_persist_dir`, keeping the v0.1 controller sealed.
@@ -2766,7 +2775,7 @@ class StreamCRetentionHousekeeper:
 | Non-code workspace files | `WorkspaceStateMonitor` (wraps `WorkspaceFileWatcher`) | `workspace_file` |
 | Static design docs | `DesignDocMonitor` (one-shot scan) | `design_doc` |
 
-**OFFLINE (not implemented):** Clipboard, voice, browser — absent structurally.
+**OFFLINE (not implemented):** Clipboard, voice, browser â€” absent structurally.
 
 ### Constant `DESIGN_DOC_EXTENSIONS`
 
@@ -2816,7 +2825,7 @@ class WorkspaceStateMonitor:
 ```
 
 - Wraps `WorkspaceFileWatcher`; forwards only `DESIGN_DOC_EXTENSIONS` paths.
-- Code changes are ignored here (already handled by v0.2 `IngestionCoordinator` → Stream A).
+- Code changes are ignored here (already handled by v0.2 `IngestionCoordinator` â†’ Stream A).
 
 ### Class `DesignDocMonitor`
 
@@ -3088,7 +3097,7 @@ class CrossNodeSyncRepository {
 
 ### `abm.api.capabilities`
 
-#### `ingestAmbientEvent(event, *, registry) → AmbientIngestionResult`
+#### `ingestAmbientEvent(event, *, registry) â†’ AmbientIngestionResult`
 
 ```python
 def ingestAmbientEvent(
@@ -3100,7 +3109,7 @@ def ingestAmbientEvent(
 
 - **STATUS:** `stable`
 - **OWNER:** `abm.mobile.ambient_manager.AmbientInteractionManager`
-- **DEPENDENCIES:** `ServiceRegistry.ambient_manager` (→ controller + embedder)
+- **DEPENDENCIES:** `ServiceRegistry.ambient_manager` (â†’ controller + embedder)
 - **CONSUMERS:** Flutter foreground service (via local HTTP stub)
 
 Delegates to `AmbientInteractionManager.ingest_event()`. Never raises.
@@ -3117,7 +3126,7 @@ class AmbientIngestionResult:
     degraded: bool = False  # True if ambient_manager raised unexpectedly
 ```
 
-### `abm.api.core.registry` — new service (boot step 7)
+### `abm.api.core.registry` â€” new service (boot step 7)
 
 ```python
 @property
@@ -3153,12 +3162,12 @@ killer from terminating the execution thread. Required permissions in
 ```dart
 class AbmForegroundService {
     static final AbmForegroundService instance = AbmForegroundService._();
-    void init() → void
-    Future<void> start() → void    // raises ForegroundServiceStartException on failure
-    Future<void> stop() → void
+    void init() â†’ void
+    Future<void> start() â†’ void    // raises ForegroundServiceStartException on failure
+    Future<void> stop() â†’ void
     Future<bool> get isRunning
-    void onDataReceived(void Function(Object) callback) → void
-    void removeDataCallback(void Function(Object) callback) → void
+    void onDataReceived(void Function(Object) callback) â†’ void
+    void removeDataCallback(void Function(Object) callback) â†’ void
 }
 ```
 
@@ -3182,7 +3191,7 @@ Events:  ObserveWorkspaceFile | RecordGitActivity | ObserveDesignDoc
 States:  TelemetryIdle | TelemetrySending(sourceKind) | TelemetrySent(docId, status, sourceKind) | TelemetryFailed(error, sourceKind)
 ```
 
-No event type exists for clipboard, voice, or browser — scope enforced at the Dart type level.
+No event type exists for clipboard, voice, or browser â€” scope enforced at the Dart type level.
 
 ### `AmbientEventModel` (Dart)
 
@@ -3199,8 +3208,8 @@ class AmbientEventModel {
     final int epochTimestamp;
     final String deviceSource;   // always "dynamic_mobile_node"
 
-    Map<String, dynamic> toJson() → ...
-    factory AmbientEventModel.fromJson(Map<String, dynamic>) → ...
+    Map<String, dynamic> toJson() â†’ ...
+    factory AmbientEventModel.fromJson(Map<String, dynamic>) â†’ ...
 }
 ```
 
@@ -3214,7 +3223,7 @@ JSON field names match the Python `AmbientEvent` dataclass exactly.
 
 ```dart
 class SyncSettingsService {
-    Future<String> getBaseUrl() → "http://172.24.56.26:8765" by default
+    Future<String> getBaseUrl() â†’ "http://172.24.56.26:8765" by default
     Future<void> setBaseUrl(String url)
 }
 
@@ -3237,14 +3246,14 @@ class TelemetryRepository {
     TelemetryRepository({required String baseUrl, ...})
     factory TelemetryRepository.defaultInstance()   // baseUrl = "http://127.0.0.1:8765"
 
-    Future<TelemetryResult> sendEvent(AmbientEventModel event) → never throws
+    Future<TelemetryResult> sendEvent(AmbientEventModel event) â†’ never throws
     Future<List<TelemetryResult>> sendBatch(List<AmbientEventModel> events)
     void dispose()
 }
 ```
 
 `kIngestEndpoint = "/api/ingest_ambient_event"`. Timeout: 10s. All failures returned
-as `TelemetryResult.success == false` (constitution rule 9 — degrade gracefully).
+as `TelemetryResult.success == false` (constitution rule 9 â€” degrade gracefully).
 
 ---
 
@@ -3262,15 +3271,15 @@ python -m pytest tests/test_phase_v10_mobile_gate.py -v
 python -m pytest tests/ -v
 ```
 
-### Hard gate proofs (54 tests — all mocked, no live Ollama required)
+### Hard gate proofs (54 tests â€” all mocked, no live Ollama required)
 
 | Class | Proves |
 |-------|--------|
 | `TestAmbientEventSchemaGate` | Only PERMITTED_SOURCE_KINDS accepted; clipboard/voice/browser/unknown raise ValueError; device_source defaults to "desktop_workspace" but respects constructor arg; empty text raises; epoch_timestamp defaults to positive int |
-| `TestStreamCWriterRetentionAwareGate` | Unique event → ok; duplicate within compress window → compressed; same event beyond window → ok; metadata has exactly 3 fields; embedding failure → error; ChromaDB failure → error; housekeeper called after ok; not called after compressed |
+| `TestStreamCWriterRetentionAwareGate` | Unique event â†’ ok; duplicate within compress window â†’ compressed; same event beyond window â†’ ok; metadata has exactly 3 fields; embedding failure â†’ error; ChromaDB failure â†’ error; housekeeper called after ok; not called after compressed |
 | `TestRetentionHousekeeperLifecycleGate` | run_if_due skips before interval; runs after interval; force_run deletes past 180d; force_run summarizes past 14d; lifecycle constants match MEMORY_LIFECYCLE_POLICY |
-| `TestAmbientInteractionManagerScopeGate` | Git monitor None without repo; poll_git returns 0 without monitor; poll_git rate-limited; ingest permitted kind → ok/compressed; prohibited kind blocked at AmbientEvent construction; is_running False before start; design doc extensions correct |
-| `TestIngestAmbientEventCapabilityGate` | Returns AmbientIngestionResult; compressed status passed through; manager exception → degraded=True; STATUS tag is "stable"; OWNER names AmbientInteractionManager |
+| `TestAmbientInteractionManagerScopeGate` | Git monitor None without repo; poll_git returns 0 without monitor; poll_git rate-limited; ingest permitted kind â†’ ok/compressed; prohibited kind blocked at AmbientEvent construction; is_running False before start; design doc extensions correct |
+| `TestIngestAmbientEventCapabilityGate` | Returns AmbientIngestionResult; compressed status passed through; manager exception â†’ degraded=True; STATUS tag is "stable"; OWNER names AmbientInteractionManager |
 | `TestEncryptedCrossNodeSyncGate` | Flutter sync declares `cryptography` and `flutter_secure_storage`; key store uses `AesGcm.with256bits()` and secure storage; channel uses AES-GCM encrypt/decrypt with AAD; handshake and encrypted payload fields are fixed |
 | `TestV01ToV10MobileRegressionGate` | All v0.1 collection names unchanged; PERMITTED_SOURCE_KINDS exactly 3; compress window 3600; housekeeping interval 3600; lifecycle thresholds 14/30/180; AmbientTelemetryMetadata has exactly 3 fields; archive collection name correct; device_source correct |
 
@@ -3292,15 +3301,15 @@ python -m pytest tests/test_phase_v1_completion_gate.py -v
 python -m pytest tests/ -v
 ```
 
-### Hard gate proofs (36 tests — final roadmap gate)
+### Hard gate proofs (36 tests â€” final roadmap gate)
 
 | Class | Proves |
 |-------|--------|
 | `TestForegroundServiceSurvivalGate` | No Tecno Spark 40 / hardware hardcoding; uses `flutter_foreground_task`; wake lock + boot restart + repeat heartbeat survive simulated low-memory trim |
 | `TestEncryptedSyncIntegrityGate` | Only `cryptography` + `flutter_secure_storage`; unencrypted payloads rejected; tampered ciphertext/MAC/AAD fail AES-GCM auth |
 | `TestAmbientManagerSourceAllowlistGate` | Only `git_commit`, `workspace_file`, `design_doc`; code files ignored; clipboard/voice/browser absent in Python + Dart + manifest |
-| `TestStreamCCompressionWindowGate` | Duplicates within 3600 s → `compressed`; after window → stored again; housekeeper summarizes past 14 d and deletes past 180 d |
-| `TestRoadmapRegressionGate` | All prior gates (`v0.1`–`v0.5`, Client #1, mobile gate) subprocess-verified still 100% green |
+| `TestStreamCCompressionWindowGate` | Duplicates within 3600 s â†’ `compressed`; after window â†’ stored again; housekeeper summarizes past 14 d and deletes past 180 d |
+| `TestRoadmapRegressionGate` | All prior gates (`v0.1`â€“`v0.5`, Client #1, mobile gate) subprocess-verified still 100% green |
 
 ---
 
@@ -3314,17 +3323,17 @@ python -m abm.launcher
 ```
 
 The unified background process entry point for ABM. It starts the following components in parallel threads inside a single process, avoiding orphaned processes and file lock contention:
-1. `WorkspaceFileWatcher` (via `abm.companion.watch_daemon.build_coordinator`) — watches paths defined in `.abm_watch_paths.json` or defaults to the repository root.
-2. `SyncServerHandler` (via `abm.mobile.sync_server`) — HTTP server for incoming ambient telemetry.
-3. Retention Housekeeper Loop — periodically triggers `StreamCRetentionHousekeeper.run_if_due()` to compress or archive ambient memory.
+1. `WorkspaceFileWatcher` (via `abm.companion.watch_daemon.build_coordinator`) â€” watches paths defined in `.abm_watch_paths.json` or defaults to the repository root.
+2. `SyncServerHandler` (via `abm.mobile.sync_server`) â€” HTTP server for incoming ambient telemetry.
+3. Retention Housekeeper Loop â€” periodically triggers `StreamCRetentionHousekeeper.run_if_due()` to compress or archive ambient memory.
 
-4. Background Ollama subprocess (if `ollama serve` is not already running), including `phi3:mini` pre-warming.
+4. Background Ollama subprocess (if `ollama serve` is not already running), including `qwen2.5-coder:3b` pre-warming.
 
 Gracefully handles `SIGINT` (Ctrl+C) and `SIGTERM` by signaling an internal threading event, shutting down the HTTP server, and executing a clean `ServiceRegistry.shutdown()`. Also cleanly terminates the Ollama subprocess if it was started by the launcher.
 
 ---
 
-## Phase v1.0 — API Capabilities
+## Phase v1.0 â€” API Capabilities
 
 ### Dataclass `AnswerResult`
 
@@ -3343,11 +3352,11 @@ class AnswerResult:
 ```
 
 **Attributes:**
-- `synthesis` — Natural-language answer synthesized by the model gateway from the retrieved `hits`. Grounded strictly in the context chunks.
+- `synthesis` â€” Natural-language answer synthesized by the model gateway from the retrieved `hits`. Grounded strictly in the context chunks.
 
 ---
 
-### `answerQuestion(question: str, *, registry: ServiceRegistry, n_results: int | None = None) -> AnswerResult`
+### `answerQuestion(question: str, *, registry: ServiceRegistry, n_results: int | None = None, history: list[dict[str, str]] | None = None) -> AnswerResult`
 
 Routes a natural-language question. If the question is a basic conversational greeting or trivial identity question (e.g. "hello", "who are you"), it hits a fast-path that bypasses classification and memory retrieval, generating a warm synthesized response immediately. Otherwise, it routes through the classification engine and retrieves relevant memory from the department's allowed streams, returning a grounded synthesized answer.
 
@@ -3355,6 +3364,12 @@ Routes a natural-language question. If the question is a basic conversational gr
 **OWNER:** `abm.orchestrator.router.ClassificationRouter`
 **DEPENDENCIES:** `ServiceRegistry.router`, `ServiceRegistry.embedder`, `ServiceRegistry.controller`, `ServiceRegistry.gateway`
 **CONSUMERS:** console `ask` command
+
+**Parameters:**
+- `question` â€” The question to answer. Must be non-empty.
+- `registry` â€” Booted service registry.
+- `n_results` â€” Number of documents to retrieve.
+- `history` â€” Optional session history (e.g. `[{"role": "user", "content": "..."}]`) kept only in the presentation layer.
 
 **Returns:** `AnswerResult`
 
@@ -3372,8 +3387,8 @@ class RunTaskResult:
 ```
 
 **Attributes:**
-- `task_id` — The unique contract ID assigned to the dispatched task.
-- `degraded` — True if Ollama was unreachable, meaning the task could not be classified.
+- `task_id` â€” The unique contract ID assigned to the dispatched task.
+- `degraded` â€” True if Ollama was unreachable, meaning the task could not be classified.
 
 ---
 
@@ -3387,10 +3402,47 @@ Classifies the task, dispatches it to a background worker for execution in the s
 **CONSUMERS:** console `run` command
 
 **Parameters:**
-- `objective` — The task description. Must be non-empty.
-- `registry` — Booted service registry.
+- `objective` â€” The task description. Must be non-empty.
+- `registry` â€” Booted service registry.
 
 **Returns:** `RunTaskResult`
+
+---
+
+### Dataclass `ReviewProjectResult`
+
+Return type for `reviewProject`.
+
+```python
+@dataclass
+class ReviewProjectResult:
+    project_name: str
+    hits: list[dict[str, Any]]
+    synthesis: str = ""
+    degraded: bool = False
+```
+
+**Attributes:**
+- `synthesis` â€” Actionable improvement suggestions synthesized by the model gateway from the retrieved `hits`.
+
+---
+
+### `reviewProject(project_name: str, *, registry: ServiceRegistry, n_results: int = 10) -> ReviewProjectResult`
+
+Retrieves a project's Stream A entries (code topologies) and synthesizes actionable improvement suggestions strictly grounded in the ingested code.
+
+**STATUS:** stable
+**OWNER:** `abm.memory.chroma_controller.ChromaController` (retrieval) / `abm.gateway` (synthesis)
+**DEPENDENCIES:** `ServiceRegistry.embedder`, `ServiceRegistry.controller`, `ServiceRegistry.gateway`
+**CONSUMERS:** console `review` command
+
+**Parameters:**
+- `project_name` â€” Project name used as the retrieval query.
+- `registry` â€” Booted service registry.
+- `n_results` â€” Number of code chunks to retrieve.
+
+**Returns:** `ReviewProjectResult`
+
 
 
 ## Phase v1.0  Encrypted Telemetry Sync
@@ -3448,3 +3500,95 @@ Abstract interface for the text-generation model gateway. Implemented by `Ollama
 
 - **`is_available() -> bool`**
   Check whether the model gateway is reachable and ready.
+
+### Dataclass: `Event`
+
+Immutable dataclass (`frozen=True`) representing a system event.
+
+#### Fields
+- **`topic: str`**: Dot-separated topic string (e.g. `"code.changed"`, `"telemetry.ingested"`).
+- **`payload: dict[str, Any]`**: Event data payload (defaults to empty dict).
+- **`source: str`**: Subsystem or module identifier publishing the event (defaults to `"system"`).
+- **`event_id: str`**: Unique UUIDv4 identifier string.
+- **`timestamp: float`**: UNIX epoch timestamp of creation.
+
+### Constants: `SystemTopic`
+
+Standard system event topics per `ABM_SPEC.md`:
+- `CODE_CHANGED = "code.changed"`
+- `CONTEXT_STREAM_QUARANTINED = "context.stream.quarantined"`
+- `HARDWARE_SHIFT_DETECTED = "hardware.shift.detected"`
+- `TASK_DISPATCHED = "task.dispatched"`
+- `TASK_COMPLETED = "task.completed"`
+- `TASK_FAILED = "task.failed"`
+- `TELEMETRY_INGESTED = "telemetry.ingested"`
+- `SYSTEM_BOOT = "system.boot"`
+- `SYSTEM_SHUTDOWN = "system.shutdown"`
+
+### Class: `EventBusInterface(abc.ABC)`
+
+Abstract interface for the decoupled publish/subscribe Event Bus subsystem.
+
+#### Methods
+- **`subscribe(topic: str, handler: Callable[[Event], Any], *, priority: int = 0) -> str`**
+  Subscribe a callback handler to an event topic pattern (`"exact"`, `"*"`, `"prefix.*"`).
+  Priority controls order (higher executed first). Returns unique subscription ID.
+- **`unsubscribe(subscription_id: str) -> bool`**
+  Unregister a subscription handler. Returns `True` if removed.
+- **`publish(event: Event) -> int`**
+  Synchronously dispatch event to all matching subscribers with error isolation.
+  Returns number of handlers invoked.
+- **`publish_async(event: Event) -> None`**
+  Non-blocking asynchronous event dispatch via background worker queue.
+- **`start() -> None`**
+  Start background worker threads.
+- **`stop(timeout: float = 2.0) -> None`**
+  Drain queued events and stop background workers.
+- **`drain(timeout: float = 2.0) -> None`**
+  Block until queued asynchronous events finish execution.
+- **`subscriber_count(topic: str | None = None) -> int`**
+  Return active subscriber count.
+- **`clear() -> None`**
+  Remove all active subscriptions.
+
+### Module: `abm.api.core.bus`
+
+File: [`abm/api/core/bus.py`](file:///c:/Users/araba/Desktop/Projects/ABM-2.0/abm/api/core/bus.py)
+
+Concrete thread-safe implementation of `EventBusInterface`.
+- Implements fnmatchcase glob wildcard matching.
+- Enforces Constitution Rule 9: exceptions in subscribers are caught, logged, and isolated without crashing the bus or other subscribers.
+- Exposed via `ServiceRegistry.event_bus`.
+
+---
+
+## Client #2 â€” Web UI & API
+
+**Locations:**
+- Backend: `abm/clients/web/main.py`
+- Frontend: `abm/clients/web-ui/`
+
+**Start Commands:**
+- API:
+  ```bash
+  python -m abm.clients.web.main
+  ```
+- UI Setup & Run:
+  ```bash
+  cd abm/clients/web-ui
+  npm install
+  npm run dev
+  ```
+
+### API Surface
+
+- `POST /api/ask`
+  - Request: `{"question": "...", "session_id": "optional_uuid"}`
+  - Response: JSON with `synthesis`, `hits`, and `session_id`.
+- `POST /api/ingest`
+  - Request: `multipart/form-data` file upload.
+  - Response: JSON with ingestion results.
+- `GET /api/sessions`
+  - Response: JSON list of all sessions (`{"sessions": [{"id": "...", "title": "...", "timestamp": 123}]}`).
+- `GET /api/session?id=<id>`
+  - Response: JSON containing the session details and its `messages` array.

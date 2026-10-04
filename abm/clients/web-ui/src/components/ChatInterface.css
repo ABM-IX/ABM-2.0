@@ -1,0 +1,195 @@
+.chat-interface {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 1.5rem;
+}
+
+.messages-container {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  padding-right: 1rem;
+}
+
+.empty-state {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  color: var(--text-muted);
+}
+
+.empty-icon {
+  color: rgba(99, 102, 241, 0.4);
+}
+
+.empty-state p {
+  font-size: 1.2rem;
+  margin: 0;
+  font-weight: 500;
+}
+
+.message-wrapper {
+  display: flex;
+  width: 100%;
+  gap: 1rem;
+  align-items: flex-end;
+}
+
+.message-wrapper.user {
+  flex-direction: row-reverse;
+}
+
+.message-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.message-avatar.user {
+  background: linear-gradient(135deg, var(--accent), #a78bfa);
+  color: white;
+  box-shadow: 0 4px 10px rgba(99, 102, 241, 0.3);
+}
+
+.message-avatar.agent {
+  background: rgba(39, 39, 42, 0.8);
+  border: 1px solid var(--border-light);
+  color: #a78bfa;
+}
+
+.message-bubble {
+  max-width: 75%;
+  padding: 1rem 1.2rem;
+  border-radius: 20px;
+  line-height: 1.6;
+  font-size: 0.95rem;
+}
+
+.message-bubble.user {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-light);
+  color: var(--text-main);
+  border-bottom-right-radius: 4px;
+}
+
+.message-bubble.agent {
+  background: linear-gradient(145deg, rgba(39, 39, 42, 0.7), rgba(24, 24, 27, 0.4));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom-left-radius: 4px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+}
+
+.message-sources {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.85rem;
+  color: var(--text-muted);
+}
+
+.message-sources h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.85rem;
+  color: var(--text-main);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.message-sources ul {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.message-sources li {
+  margin-bottom: 0.5rem;
+}
+
+.source-collection {
+  color: #818cf8;
+  font-weight: 600;
+  margin-right: 0.5rem;
+}
+
+.input-area {
+  display: flex;
+  gap: 1rem;
+  padding: 1rem;
+  margin-top: auto; /* Push to bottom */
+}
+
+.input-area input {
+  flex: 1;
+}
+
+.send-btn {
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+}
+
+/* Loading Dots */
+.loading {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  color: var(--text-muted);
+  font-weight: 500;
+  padding: 0.8rem 1.2rem;
+}
+
+.spinner {
+  animation: spin 1s linear infinite;
+  color: #818cf8;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Text selection: always allow copying message text */
+.message-bubble {
+  user-select: text;
+  -webkit-user-select: text;
+  pointer-events: auto;
+  cursor: text;
+}
+
+/* ReactMarkdown prose styles inside agent bubbles */
+.message-bubble.agent p {
+  margin: 0 0 0.5rem 0;
+  color: var(--text-main);
+}
+.message-bubble.agent p:last-child {
+  margin-bottom: 0;
+}
+.message-bubble.agent strong {
+  color: #a78bfa;
+  font-weight: 600;
+}
+.message-bubble.agent code {
+  background: rgba(99, 102, 241, 0.15);
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+.message-bubble.agent ul,
+.message-bubble.agent ol {
+  margin: 0.5rem 0 0.5rem 1.2rem;
+  padding: 0;
+}
+.message-bubble.agent li {
+  margin-bottom: 0.25rem;
+}
+.

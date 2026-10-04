@@ -27,7 +27,10 @@ import logging
 import os
 import re
 import time
+from datetime import datetime
 from dataclasses import dataclass, field
+
+import pypdf
 from pathlib import Path
 from typing import Any
 
@@ -35,13 +38,15 @@ from abm.api.core.interfaces import EmbedderInterface, VectorStoreInterface
 from abm.memory.chroma_controller import (
     COLLECTION_AMBIENT_TELEMETRY,
     COLLECTION_CODE_TOPOLOGIES,
+    COLLECTION_TECHNICAL_MASTERY,
 )
 from abm.memory.chunking import (
     chunk_stream_a_code_topologies,
+    chunk_stream_b_technical_mastery,
     chunk_stream_c_ambient_telemetry,
 )
 
-from .file_watcher import CODE_EXTENSIONS, DEVICE_SOURCE, FileChangeEvent
+from .file_watcher import CODE_EXTENSIONS, DEVICE_SOURCE, FileChangeEvent, _is_excluded
 from .git_pipeline import DEFAULT_MAX_COMMITS, GitPipeline
 from .style_fingerprint import StyleExtractionError, StyleFingerprintExtractor
 
@@ -127,6 +132,99 @@ class IngestionCoordinator:
         self._embedder = embedder
         self._git = git_pipeline
         self._extractor = StyleFingerprintExtractor()
+
+    # ------------------------------------------------------------------
+    # Manual ingestion
+    # ------------------------------------------------------------------
+
+    def ingest_document(self, path: str) -> list[IngestionResult]:
+        """
+        Manually ingest a file or directory.
+        Code files go to Stream A.
+        General documents (.md, .txt, .pdf) go to Stream B.
+        """
+        p = Path(path)
+        if not p.exists():
+            return [IngestionResult(status="error", collection="", reason=f"Path not found: {path}")]
+        if _is_excluded(path):
+            return [IngestionResult(status="skipped", collection="", reason=f"Path excluded: {path}")]
+            
+        if p.is_dir():
+            results = []
+            for root, dirs, files in os.walk(p):
+                # Filter exclusions
+                dirs[:] = [d for d in dirs if not _is_excluded(d)]
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    if not _is_excluded(file_path):
+                        results.extend(self.ingest_document(file_path))
+            return results
+
+        ext = p.suffix.lower()
+        if ext in CODE_EXTENSIONS:
+            # Route to Stream A via _ingest_code_file
+            event = FileChangeEvent(
+                event_type="modified",
+                path=str(p),
+                epoch_timestamp=int(time.time()),
+                repository="manual_ingest"
+            )
+            return [self._ingest_code_file(event)]
+            
+        elif ext in {".txt", ".md", ".pdf"}:
+            return [self._ingest_general_document(p, ext)]
+            
+        else:
+            return [IngestionResult(status="skipped", collection="", reason=f"Unsupported file type for manual ingestion: {ext}")]
+
+    def _ingest_general_document(self, p: Path, ext: str) -> IngestionResult:
+        try:
+            if ext == ".pdf":
+                reader = pypdf.PdfReader(str(p))
+                text = "\n".join(page.extract_text() or "" for page in reader.pages)
+            else:
+                text = p.read_text(encoding="utf-8", errors="replace")
+        except Exception as exc:
+            return IngestionResult(status="error", collection=COLLECTION_TECHNICAL_MASTERY, reason=f"Failed to read {p.name}: {exc}")
+            
+        if not text.strip():
+            return IngestionResult(status="skipped", collection=COLLECTION_TECHNICAL_MASTERY, reason=f"File is empty: {p.name}")
+            
+        try:
+            chunks = chunk_stream_b_technical_mastery(text)
+        except Exception as exc:
+            return IngestionResult(status="error", collection=COLLECTION_TECHNICAL_MASTERY, reason=f"Failed to chunk {p.name}: {exc}")
+
+        written_ids = []
+        for i, chunk in enumerate(chunks):
+            if len(chunk) > 32000:
+                logger.warning("_ingest_general_document: chunk %d for '%s' exceeds 32000 chars and will be skipped.", i, p.name)
+                continue
+            doc_id = self._doc_id(f"manual:{p.name}:{i}", chunk)
+            try:
+                metadata = {
+                    "source": "docs_fetch",
+                    "date_acquired": datetime.now().date().isoformat(),
+                    "confidence_score": "1.0"
+                }
+                embedding = self._embedder.embed(chunk)
+                self._controller.add_document(
+                    COLLECTION_TECHNICAL_MASTERY,
+                    doc_id=doc_id,
+                    text=chunk,
+                    metadata=metadata,
+                    embedding=embedding,
+                )
+                written_ids.append(doc_id)
+            except Exception as exc:
+                logger.warning("_ingest_general_document: chunk %d failed for '%s': %s", i, p.name, exc)
+                
+        return IngestionResult(
+            status="ok" if written_ids else "skipped",
+            collection=COLLECTION_TECHNICAL_MASTERY,
+            doc_ids=written_ids,
+            reason="" if written_ids else f"No chunks produced from: {p.name}"
+        )
 
     # ------------------------------------------------------------------
     # File-change ingestion
@@ -217,6 +315,9 @@ class IngestionCoordinator:
 
         # --- Stream A: code chunks ---
         for i, chunk in enumerate(chunks):
+            if len(chunk) > 32000:
+                logger.warning("ingest_git_commit: chunk %d/%d for commit '%s' exceeds 32000 chars and will be skipped.", i + 1, len(chunks), commit_sha[:8])
+                continue
             doc_id = self._doc_id(f"git:{commit_sha[:8]}:{language}:{i}", chunk)
             try:
                 fp = self._extractor.extract(chunk, language)
@@ -381,6 +482,13 @@ class IngestionCoordinator:
 
         written_ids: list[str] = []
         for i, chunk in enumerate(chunks):
+            if len(chunk) > 32000:
+                logger.warning(
+                    "_ingest_code_file: chunk %d for '%s' exceeds 32000 chars (approx 8192 tokens) and will be skipped.",
+                    i, event.path
+                )
+                continue
+
             doc_id = self._doc_id(f"file:{event.path}:{i}", chunk)
             try:
                 fp = self._extractor.extract(chunk, language)

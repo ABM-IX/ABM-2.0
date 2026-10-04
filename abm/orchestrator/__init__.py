@@ -1,16 +1,16 @@
-"""
-ABM 2.0 — abm.orchestrator
+﻿"""
+ABM 2.0 â€” abm.orchestrator
 Phase v0.3: Executive Orchestrator Engine
 
 Exports the four v0.3 components:
   - ClassificationRouter  : non-generating task classification router
-  - OllamaModelGateway    : phi3:mini caller via local Ollama loopback
+  - OllamaModelGateway    : qwen2.5-coder:3b caller via local Ollama loopback
   - ModelGatewayError     : raised on any gateway failure
   - GenerationResponse    : raw output from OllamaModelGateway.generate()
   - Department            : enum of all valid routing departments
   - DepartmentWorkerSandbox : frozen sandbox config per department
-  - DEPARTMENT_REGISTRY   : dept → sandbox lookup table
-  - get_sandbox           : department → DepartmentWorkerSandbox lookup
+  - DEPARTMENT_REGISTRY   : dept â†’ sandbox lookup table
+  - get_sandbox           : department â†’ DepartmentWorkerSandbox lookup
   - department_from_string: normalises raw model strings to Department
   - TaskContract          : immutable delegation contract (spec section 5)
   - RouterResult          : complete output of ClassificationRouter.classify()

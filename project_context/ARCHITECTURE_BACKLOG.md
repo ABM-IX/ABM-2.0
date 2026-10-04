@@ -14,10 +14,8 @@ gated, not assumed).
   instead of direct instantiation) — enables swapping ChromaDB for
   another vector store without touching clients.
 - Event Bus — decoupled publish/subscribe communication between services.
-  Correct timing per this discussion: valuable once there are multiple
-  independent subsystems reacting to the same events (Planner, Research,
-  Reflection, Notifications) — not needed while interfaces.md contracts
-  are sufficient, as they are today.
+  [Delivered & Gated in Phase v2.0 Increment 2: `abm/api/core/bus.py`,
+  `EventBusInterface`, and `test_phase_v20_increment2_event_bus_gate.py`].
 - Plugin Architecture — a registration interface (`register()`,
   `capabilities()`, `permissions()`) so new departments/agents don't
   require editing core.

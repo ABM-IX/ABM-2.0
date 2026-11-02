@@ -4,8 +4,20 @@ Short, immutable, and binding on every module and every phase. When a
 phase brief and this document conflict, this document wins. Every agent
 working on this repo should read this alongside `PROJECT_BRIEF.md`.
 
-1. **Local-first by default.** No cloud LLM API, ever, unless a future
-   version of this document explicitly revises this rule.
+1. **Local-first by default — REVISED 2026-11-02.** The original rule
+   ("no cloud LLM API, ever") is explicitly revised, as this clause
+   anticipated: this host cannot run local LLM inference without choking
+   the machine (verified directly — a 30B model failed to load with
+   "model requires more system memory"; even an 8B model would consume
+   nearly all available RAM). Groq is now the sole active reasoning
+   provider (`GroqModelGateway`, behind the existing `ModelGatewayInterface`
+   — nothing else changes). Non-negotiables that still apply, unchanged:
+   (a) a sensitivity classifier runs before every Groq call and blocks
+   Stream D identity/business content and non-ABM client-project content
+   from ever leaving the machine; (b) `OllamaModelGateway`'s code remains
+   in the repo, dormant and unwired, for when hardware allows local
+   inference again; (c) on Groq failure, ABM says so plainly rather than
+   silently falling back to a local load.
 2. **Human approval before irreversible actions.** Nothing deletes,
    overwrites, or ships without ABM's explicit action.
 3. **Memory must be explainable.** Every stored entry traces to a source

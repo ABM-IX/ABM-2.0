@@ -21,12 +21,17 @@ Design contract:
 
 from __future__ import annotations
 
+import json
 import logging
+import os
+import re
 import shlex
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, field
+from difflib import SequenceMatcher
 from pathlib import Path
 from typing import Optional
 
@@ -212,4 +217,168 @@ class DynamicLauncher:
         return None
 
 
-__all__ = ["DynamicLauncher", "LaunchResult"]
+# ---------------------------------------------------------------------------
+# Dynamic installed-app lookup (2026-11-02 addition)
+# ---------------------------------------------------------------------------
+#
+# DIRECT_APP_MAP only knows a curated set of app names. DynamicLauncher above
+# resolves a KNOWN command via PATH, which works for CLI-style tools but
+# misses most GUI apps and games (installers rarely add themselves to PATH)
+# and can't reach Microsoft Store/UWP apps at all (they have no .exe on PATH
+# — they're launched via an AppID through explorer.exe, not a normal process
+# start). This covers both gaps by asking Windows itself what's installed,
+# the same way Windows Search does, instead of trying to hardcode every app
+# Arabang might ever install.
+#
+# Local-use only: this is wired into the local chat path (capabilities.py),
+# NOT the remote phone->PC sync_server path, which intentionally stays
+# restricted to the curated DIRECT_APP_MAP only (see sync_server.py's own
+# "Arbitrary command execution is rejected" contract) — a looser, fuzzy,
+# "launch whatever's closest" match is reasonable when Arabang is directly
+# at his own keyboard, not when a command arrives from another device.
+
+_STARTAPPS_CACHE: Optional[list[dict]] = None
+_STARTAPPS_CACHE_TIME: float = 0.0
+_STARTAPPS_CACHE_TTL_S = 300.0  # 5 minutes — installed apps don't change often
+_FUZZY_MATCH_THRESHOLD = 0.72
+
+
+def _normalize_app_name(name: str) -> str:
+    return re.sub(r"[^a-z0-9]", "", name.lower())
+
+
+def _get_installed_apps(force_refresh: bool = False) -> list[dict]:
+    """
+    Enumerate every app registered in the Windows Start Menu — classic
+    .exe-backed apps AND Microsoft Store/UWP apps — via PowerShell's
+    built-in ``Get-StartApps`` cmdlet. Cached for 5 minutes.
+
+    Returns a list of ``{"Name": ..., "AppID": ...}`` dicts. Never raises;
+    returns [] (or the last good cache) on any failure, including on a
+    non-Windows host.
+
+    NOTE: written and syntax-checked but not executed against a real
+    Windows machine — this bridge has no PowerShell/Windows runtime to
+    verify against. First real run is the actual test.
+    """
+    global _STARTAPPS_CACHE, _STARTAPPS_CACHE_TIME
+    now = time.time()
+    if (
+        not force_refresh
+        and _STARTAPPS_CACHE is not None
+        and (now - _STARTAPPS_CACHE_TIME) < _STARTAPPS_CACHE_TTL_S
+    ):
+        return _STARTAPPS_CACHE
+
+    if sys.platform != "win32":
+        return []
+
+    try:
+        result = subprocess.run(
+            ["powershell", "-NoProfile", "-NonInteractive", "-Command",
+             "Get-StartApps | ConvertTo-Json -Compress"],
+            capture_output=True,
+            text=True,
+            timeout=10,
+        )
+        if result.returncode != 0 or not result.stdout.strip():
+            logger.warning(
+                "launcher_map: Get-StartApps returned no usable output (rc=%s) — %s",
+                result.returncode, result.stderr.strip()[:300],
+            )
+            return _STARTAPPS_CACHE or []
+
+        data = json.loads(result.stdout)
+        if isinstance(data, dict):
+            data = [data]  # PowerShell doesn't wrap a single result in a list
+        if not isinstance(data, list):
+            return _STARTAPPS_CACHE or []
+
+        _STARTAPPS_CACHE = data
+        _STARTAPPS_CACHE_TIME = now
+        logger.info("launcher_map: enumerated %d installed apps via Get-StartApps.", len(data))
+        return data
+    except Exception as exc:
+        logger.warning("launcher_map: could not enumerate installed apps — %s", exc)
+        return _STARTAPPS_CACHE or []
+
+
+def find_installed_app(query: str) -> Optional[dict]:
+    """
+    Fuzzy-match `query` (e.g. "fc 26", "what's app") against every app
+    actually installed on this machine. Returns the best-matching
+    ``{"Name": ..., "AppID": ...}`` dict, or None if nothing crosses the
+    confidence threshold. Never raises.
+    """
+    target = _normalize_app_name(query)
+    if not target:
+        return None
+
+    apps = _get_installed_apps()
+    best: Optional[dict] = None
+    best_score = 0.0
+
+    for app in apps:
+        app_name = app.get("Name") or ""
+        normalized = _normalize_app_name(app_name)
+        if not normalized:
+            continue
+        if target == normalized or target in normalized or normalized in target:
+            return app  # strong/exact-ish match — stop immediately
+        score = SequenceMatcher(None, target, normalized).ratio()
+        if score > best_score:
+            best_score = score
+            best = app
+
+    return best if best_score >= _FUZZY_MATCH_THRESHOLD else None
+
+
+def launch_installed_app(query: str) -> LaunchResult:
+    """
+    Resolve `query` via find_installed_app() and launch it.
+
+    ``explorer.exe shell:AppsFolder\\<AppID>`` only works when AppID is a
+    genuine UWP/Microsoft Store package identity — a
+    "PackageFamilyName!AppId" string (it always contains "!"). For a
+    classic installed app or a Steam-created Start Menu shortcut,
+    ``Get-StartApps`` reports AppID as a plain file path instead, and
+    shell:AppsFolder does not accept that at all — it just fails.
+
+    Root-cause fix (2026-11-02): this is why "open fc 26" errored out.
+    FC 26 is a Steam game, so its Start Menu shortcut's AppID is a plain
+    path, not a UWP package identity. We now branch on whether "!" is
+    present: UWP apps still go through shell:AppsFolder; everything else
+    goes through os.startfile(), which is the correct Windows-native way
+    to open a plain .exe OR a .lnk shortcut (including one that itself
+    points at a steam:// URI).
+    """
+    app = find_installed_app(query)
+    if not app:
+        return LaunchResult(
+            success=False,
+            command=query,
+            error=f"No installed app matched '{query}'.",
+        )
+
+    app_id = app.get("AppID", "")
+    app_name = app.get("Name", query)
+    if not app_id:
+        return LaunchResult(success=False, command=query, error=f"Matched '{app_name}' but it has no AppID.")
+
+    try:
+        if "!" in app_id:
+            # Genuine UWP/Microsoft Store package identity.
+            proc = subprocess.Popen(["explorer.exe", f"shell:AppsFolder\\{app_id}"])
+            pid = proc.pid
+        else:
+            # Classic app or Steam/other shortcut — AppID is a plain path.
+            os.startfile(app_id)  # type: ignore[attr-defined]  (Windows-only API)
+            pid = None
+        logger.info("launcher_map.launch_installed_app: launched '%s' (AppID=%s).", app_name, app_id)
+        return LaunchResult(success=True, command=app_name, pid=pid)
+    except Exception as exc:
+        logger.warning("launcher_map.launch_installed_app: failed to launch '%s' — %s", app_name, exc)
+        return LaunchResult(success=False, command=query, error=f"Found '{app_name}' but launch failed: {exc}")
+
+
+__all__ = ["DynamicLauncher", "LaunchResult", "find_installed_app", "launch_installed_app"]

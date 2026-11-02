@@ -101,6 +101,24 @@ _CONVERSATIONAL_RESPONSES: list[str] = [
     "Take care! I'll be here when you need me.",
 ]
 
+#: Shared persona preamble for the two general conversational prompts in
+#: answerQuestion() below (with-hits and no-hits). Added 2026-11-02: Arabang
+#: said ABM "is more like a tool than a companion" — both prompts used to
+#: open with strict formatting/anti-hallucination rules and nothing about
+#: who ABM is supposed to BE, which pushed responses toward clinical and
+#: guarded. This leads every conversational prompt instead, so personality
+#: isn't competing for attention with the correctness rules — it comes first.
+_ABM_PERSONA_PREAMBLE = (
+    "You are ABM 2.0 — Arabang's personal cognitive layer and digital twin, "
+    "not a generic chatbot or a search box. You've been built together, "
+    "piece by piece, as a genuine working partner on his projects (First "
+    "Minds, SmartTransit, Mokgosi, Leseding, and more). Talk like that "
+    "partner would: warm, direct, a little informal, genuinely engaged "
+    "with what he's actually asking — not a customer-support script. Use "
+    "\"I\" naturally, react to what he just said before moving on, and keep "
+    "it conversational rather than reciting information back at him.\n"
+)
+
 
 # ============================================================================
 # Shared return types
@@ -371,8 +389,8 @@ def answerQuestion(
     # Feature 5 — Tier-1 deterministic app launcher (zero tokens)
     # -------------------------------------------------------------------------
     try:
-        from abm.automation.direct_app_map import match_tier1_intent, resolve_command
-        from abm.automation.launcher_map import DynamicLauncher
+        from abm.automation.direct_app_map import match_tier1_intent, resolve_command, extract_open_phrase
+        from abm.automation.launcher_map import DynamicLauncher, launch_installed_app
         import subprocess
 
         tier1 = match_tier1_intent(question)
@@ -408,6 +426,36 @@ def answerQuestion(
                     fallback_used=False,
                     degraded=False,
                 )
+        else:
+            # Added 2026-11-02: DIRECT_APP_MAP only knows a curated set of
+            # apps. Before giving up, check whether this looks like an
+            # "open X" request for something ABM just doesn't have a
+            # hardcoded entry for (a game, a newly installed tool) and, if
+            # so, try matching it against everything actually installed on
+            # this machine (Windows Start Menu, via launcher_map's
+            # find_installed_app/launch_installed_app). Local path only —
+            # the remote phone->PC sync channel intentionally stays
+            # restricted to the curated map. If nothing matches, this
+            # falls through silently to the normal conversational pipeline
+            # rather than returning an error for what might just be an
+            # ordinary sentence that happened to contain "open".
+            open_phrase = extract_open_phrase(question)
+            if open_phrase:
+                dyn_result = launch_installed_app(open_phrase)
+                if dyn_result.success:
+                    return AnswerResult(
+                        question=question,
+                        department="tier1_action",
+                        confidence="high",
+                        synthesis=f"\u2705 Launched {dyn_result.command} (PID {dyn_result.pid}).",
+                        fallback_used=False,
+                        degraded=False,
+                    )
+                else:
+                    logger.debug(
+                        "answerQuestion: dynamic app lookup found no match for '%s' — %s",
+                        open_phrase, dyn_result.error,
+                    )
     except Exception as _t1_exc:
         logger.debug("answerQuestion: Tier-1 intent check failed — %s", _t1_exc)
 
@@ -537,8 +585,19 @@ def answerQuestion(
                     response = registry.gateway.generate(prompt, max_tokens=180)
                     synthesis = response.text
                 except Exception as exc:
+                    # Root-cause fix (2026-11-02): this used to swallow a real Groq
+                    # failure behind a generic canned greeting, which looked like a
+                    # working reply and hid the actual problem. Now it surfaces the
+                    # real failure, same as the outer handler does for every other
+                    # synthesis path.
                     logger.warning("answerQuestion: conversational synthesis failed — %s", exc)
-                    synthesis = "Hello! I am ABM 2.0, your personal cognitive layer."
+                    synthesis = (
+                        "I'm sorry, I couldn't generate an answer because the reasoning "
+                        "gateway (Groq) is unreachable or returned an error. Please check "
+                        "your GROQ_API_KEY environment variable. "
+                        f"(details: {exc})"
+                    )
+                    degraded = True
             else:
                 if hits:
                     has_governance = False
@@ -569,11 +628,18 @@ def answerQuestion(
                         history_text = f"Recent Conversation History:\n{history_str}\n\n"
 
                     prompt = (
-                        "You are ABM 2.0. Answer the user's question directly, in the first person, and with a warm, natural tone using plain conversational prose. "
-                        "Keep your response to short paragraphs (2-4 sentences max). Do not format your response as a numbered report or bulleted list (e.g., avoid 'Here are some key points... 1... 2... 3...'). Answer smoothly in flowing paragraphs.\n"
-                        "CRITICAL ANTI-HALLUCINATION RULE: If the user asks for a specific fact (e.g. what an acronym stands for, a name, a date) and the answer is NOT explicitly stated in the context, you MUST say 'I don't have that specific information' and ask for clarification. You are STRICTLY FORBIDDEN from inventing expansions for acronyms or adding outside knowledge.\n"
-                        "You must answer using ONLY the facts explicitly present in the provided context. Never fill a factual gap with a plausible-sounding invention.\n"
-                        "If the context does not contain the answer, say 'I cannot answer this based on the provided context.'\n\n"
+                        # Root-cause fix (2026-11-02): Arabang reported ABM feeling
+                        # "more like a tool than a companion" — this prompt used to
+                        # lead with strict anti-hallucination rules in ALL CAPS
+                        # before a single word about personality, which pushed the
+                        # model toward a guarded, clinical tone even for ordinary
+                        # conversation. The correctness rule is still here and still
+                        # non-negotiable; it's just no longer the FIRST or LOUDEST
+                        # thing the model reads.
+                        _ABM_PERSONA_PREAMBLE +
+                        "Answer in short, flowing paragraphs (2-4 sentences) — never a numbered report or bulleted list unless he specifically asks for one.\n"
+                        "One hard rule that doesn't bend: if he's asking for a specific fact (an acronym's meaning, a name, a date) and it isn't explicitly in the context below, say plainly that you don't have that specific detail, rather than inventing a plausible-sounding one. Stick to what's actually in the context for factual claims.\n"
+                        "If the context genuinely doesn't contain the answer, say so directly.\n\n"
                         f"{isolation_rule}"
                         f"{history_text}"
                         "Context:\n"
@@ -583,7 +649,49 @@ def answerQuestion(
                     response = registry.gateway.generate(prompt, max_tokens=180)
                     synthesis = response.text
                 else:
-                    synthesis = ""
+                    # Root-cause fix (2026-11-02, round 2): the first fix here just
+                    # replaced a silent "" with a canned "I don't have memory for
+                    # that" message — which is still a refusal, not a conversation.
+                    # Confirmed against real transcripts (screenshots) that ordinary
+                    # phrasing like "Hello, ABM. How are you? I'd like to check on
+                    # our progress..." or "I was just saying good morning ABM" both
+                    # miss the strict zero-token greeting regex AND retrieve no
+                    # hits — and a person talking normally to ABM deserves a real,
+                    # warm reply, not a refusal, just because nothing matched a
+                    # retrieval query. No grounded facts to cite is completely
+                    # normal for small talk / a vague check-in; it should not mean
+                    # "give up." The anti-hallucination rule still applies — ABM
+                    # still won't invent a SPECIFIC fact it doesn't have — but it
+                    # can and should still just talk.
+                    history_text = ""
+                    if history:
+                        history_str = "\n".join([f"{msg.get('role', 'unknown').capitalize()}: {msg.get('content', '')}" for msg in history])
+                        history_text = f"Recent Conversation History:\n{history_str}\n\n"
+
+                    prompt = (
+                        _ABM_PERSONA_PREAMBLE +
+                        "No specific facts were retrieved from memory for this message — that's "
+                        "completely normal for a greeting, small talk, or a general check-in. Just "
+                        "talk to him the way you would mid-conversation, and if it's relevant, ask "
+                        "what he'd like to dig into. Keep it short (2-4 sentences).\n"
+                        "Only if he's clearly asking for a specific fact you don't have (a name, a "
+                        "date, a number, a past decision) should you say so plainly, rather than "
+                        "inventing one.\n\n"
+                        f"{history_text}"
+                        f"Question: {question}"
+                    )
+                    try:
+                        response = registry.gateway.generate(prompt, max_tokens=180)
+                        synthesis = response.text
+                    except Exception as exc:
+                        logger.warning("answerQuestion: no-hits conversational fallback failed — %s", exc)
+                        synthesis = (
+                            "I'm sorry, I couldn't generate an answer because the reasoning "
+                            "gateway (Groq) is unreachable or returned an error. Please check "
+                            "your GROQ_API_KEY environment variable. "
+                            f"(details: {exc})"
+                        )
+                        degraded = True
     except Exception as exc:
         logger.warning("answerQuestion: synthesis failed — %s", exc)
         degraded = True

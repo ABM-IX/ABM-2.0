@@ -30,6 +30,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import os
 import subprocess
 import sys
 import threading
@@ -39,6 +40,7 @@ from pathlib import Path
 from typing import Optional
 
 import psutil
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -171,6 +173,7 @@ class ABMTrayApp:
         self._Image = None
         self._running = False
         self._status_text = "Starting…"
+        self._log_path: Optional[Path] = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -197,6 +200,8 @@ class ABMTrayApp:
             self._pystray.Menu.SEPARATOR,
             self._pystray.MenuItem("Open Web UI", self._on_open_web_ui),
             self._pystray.MenuItem("Open Window (Native)", self._on_open_native_window),
+            self._pystray.MenuItem("\U0001F3A4 Talk to ABM (voice)", self._on_talk_to_abm),
+            self._pystray.MenuItem("Open Logs", self._on_open_logs),
             self._pystray.MenuItem(
                 lambda item: self._status_text,
                 action=None,
@@ -218,6 +223,13 @@ class ABMTrayApp:
             target=self._poll_loop, daemon=True, name="abm-tray-poll"
         )
         poll_thread.start()
+
+        # Background thread: wait for backend readiness, then auto-open the
+        # native window — see _auto_open_window's docstring for why.
+        autowindow_thread = threading.Thread(
+            target=self._auto_open_window, daemon=True, name="abm-tray-autowindow"
+        )
+        autowindow_thread.start()
 
         logger.info("ABMTrayApp: entering tray icon event loop.")
         self._tray.run()
@@ -250,18 +262,59 @@ class ABMTrayApp:
     # ------------------------------------------------------------------
 
     def _start_launcher(self) -> None:
-        """Launch the ABM process as a subprocess."""
+        """
+        Launch the ABM process as a subprocess.
+
+        Root-cause fix (2026-11-02): this used to pipe stdout/stderr to
+        DEVNULL, which discarded the exact tracebacks needed to diagnose a
+        silent failure (e.g. the web API hanging on an unhandled exception).
+        Now captured to logs/abm_launcher.log instead — visible via the new
+        "Open Logs" tray menu item.
+        """
         cmd = [sys.executable, "-m", self._launcher_module]
         try:
+            log_dir = Path(__file__).resolve().parent.parent / "logs"
+            log_dir.mkdir(exist_ok=True)
+            self._log_path = log_dir / "abm_launcher.log"
+            log_file = open(self._log_path, "w", encoding="utf-8")
             self._proc = subprocess.Popen(
                 cmd,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stdout=log_file,
+                stderr=subprocess.STDOUT,
             )
-            logger.info("ABMTrayApp: started launcher (PID=%d).", self._proc.pid)
+            logger.info("ABMTrayApp: started launcher (PID=%d). Logs: %s", self._proc.pid, self._log_path)
         except Exception as exc:
             logger.error("ABMTrayApp: failed to start launcher — %s", exc)
             self._proc = None
+
+    def _wait_for_backend(self, timeout_s: float = 25.0) -> bool:
+        """Poll the web API until it answers or timeout_s elapses."""
+        deadline = time.time() + timeout_s
+        url = f"http://localhost:{self._port}/"
+        while time.time() < deadline:
+            try:
+                requests.get(url, timeout=1.5)
+                return True
+            except Exception:
+                time.sleep(0.5)
+        return False
+
+    def _auto_open_window(self) -> None:
+        """
+        Background thread: wait for the backend to actually be listening,
+        then open the native window automatically — no second click needed.
+        This replaces "launch to a hidden tray, then dig through the menu
+        for Open Window" with "click once, a visible window appears."
+        """
+        if self._wait_for_backend():
+            logger.info("ABMTrayApp: backend ready — auto-opening native window.")
+            self._on_open_native_window()
+        else:
+            logger.warning(
+                "ABMTrayApp: backend did not respond within timeout — window not "
+                "auto-opened. Check Open Logs for why, or try 'Open Window (Native)' "
+                "manually once it's up."
+            )
 
     def _poll_loop(self) -> None:
         """Background thread: polls subprocess status and updates tray icon."""
@@ -307,6 +360,44 @@ class ABMTrayApp:
             name="abm-native-window",
         )
         native_thread.start()
+
+    def _on_talk_to_abm(self, icon=None, item=None) -> None:
+        """
+        Launch the push-to-talk voice interface (abm/voice/voice_interface.py)
+        in its own console window.
+
+        This is a separate OS process, not a thread inside the tray app, for
+        two reasons: (1) the voice interface is an interactive stdin/stdout
+        CLI loop (press Enter to talk) and mixing that with pystray's own
+        event loop would be fragile; (2) if the voice process crashes, it
+        can't take the tray icon or the ABM launcher down with it. It talks
+        to the already-running ABM web API over HTTP (/api/ask), exactly
+        like this tray app's own "Open Web UI" does nothing more invasive
+        than opening a URL.
+        """
+        logger.info("ABMTrayApp: launching voice interface.")
+        try:
+            creationflags = subprocess.CREATE_NEW_CONSOLE if sys.platform == "win32" else 0
+            subprocess.Popen(
+                [sys.executable, "-m", "abm.voice.voice_interface"],
+                creationflags=creationflags,
+            )
+        except Exception as exc:
+            logger.error("ABMTrayApp: failed to launch voice interface — %s", exc)
+
+    def _on_open_logs(self, icon=None, item=None) -> None:
+        """Open the launcher's captured stdout/stderr log file."""
+        if not self._log_path or not self._log_path.exists():
+            logger.warning("ABMTrayApp: no log file yet.")
+            return
+        logger.info("ABMTrayApp: opening log file %s.", self._log_path)
+        try:
+            if sys.platform == "win32":
+                os.startfile(self._log_path)  # type: ignore[attr-defined]
+            else:
+                webbrowser.open(f"file://{self._log_path}")
+        except Exception as exc:
+            logger.error("ABMTrayApp: failed to open log file — %s", exc)
 
     def _on_stop(self, icon=None, item=None) -> None:
         """Handle Stop ABM menu click."""

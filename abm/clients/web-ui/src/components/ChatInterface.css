@@ -192,4 +192,65 @@
 .message-bubble.agent li {
   margin-bottom: 0.25rem;
 }
-.
+/* Voice interface — push-to-talk mic + voice-reply toggle (2026-11-02) */
+.mic-btn,
+.voice-toggle-btn,
+.always-listening-btn {
+  padding: 0.75rem;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease;
+}
+
+.mic-btn:hover,
+.voice-toggle-btn:hover,
+.always-listening-btn:hover {
+  color: #e2e8f0;
+  border-color: rgba(129, 140, 248, 0.4);
+}
+
+.mic-btn:disabled,
+.voice-toggle-btn:disabled,
+.always-listening-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.mic-btn.recording {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: #ef4444;
+  color: #ef4444;
+  animation: mic-pulse 1.4s ease-in-out infinite;
+}
+
+.voice-toggle-btn.active {
+  background: rgba(129, 140, 248, 0.15);
+  border-color: #818cf8;
+  color: #818cf8;
+}
+
+@keyframes mic-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.4); }
+  50% { box-shadow: 0 0 0 6px rgba(239, 68, 68, 0); }
+}
+
+/* Always-listening (hands-free wake-word) toggle (2026-11-02). Distinct
+   green so it reads differently from the red "actively recording" pulse
+   above — this button means "waiting to hear ABM 2.0", not "recording now". */
+.always-listening-btn.active {
+  background: rgba(34, 197, 94, 0.15);
+  border-color: #22c55e;
+  color: #22c55e;
+  animation: always-listening-pulse 2.2s ease-in-out infinite;
+}
+
+@keyframes always-listening-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(34, 197, 94, 0.35); }
+  50% { box-shadow: 0 0 0 6px rgba(34, 197, 94, 0); }
+}

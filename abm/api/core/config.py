@@ -71,10 +71,11 @@ class APIConfig:
     # --- Retrieval ---
     n_retrieval_results: int = 5
 
-    # --- Model Gateway (constitution rule 1: Ollama is always default/fallback) ---
-    # Set model_gateway_provider = "groq" to enable GroqModelGateway.
-    # GROQ_API_KEY env var must be set when using groq.
-    model_gateway_provider: str = "ollama"
+    # --- Model Gateway (hardware constraint: this host cannot run local
+    # inference without choking. Groq is the sole active default; Ollama's
+    # code stays in the repo, unwired, for a future hardware upgrade.) ---
+    # GROQ_API_KEY env var must be set.
+    model_gateway_provider: str = "groq"
     groq_model: str = "llama-3.1-8b-instant"
 
 

@@ -1,6 +1,7 @@
-# ABM 2.0 — Phase v0.2 Developer Companion Node
-# All inference and embeddings route through local Ollama at 127.0.0.1:11434.
-# No cloud LLM APIs permitted (spec section 4 mandate).
+# ABM 2.0
+# Reasoning routes through Groq (cloud, see ARCHITECTURAL_CONSTITUTION.md rule 1,
+# revised 2026-11-02). Embeddings still route through local Ollama at
+# 127.0.0.1:11434 (nomic-embed-text) — small enough not to choke the host.
 
 # v0.1 — Memory Brain Core
 chromadb>=0.5.0
@@ -18,3 +19,26 @@ docker>=7.0.0        # docker SDK for ephemeral sandboxes
 # v1.0 — Desktop-Side Sync Server
 cryptography>=41.0.0 # AES-256-GCM for cross-node sync payload decryption
 psutil>=5.9.0        # system memory pressure monitoring
+
+# Phase 6 — Desktop launcher (used by abm/tray_app.py; was missing from this
+# file even though the code already depended on them — fixed 2026-11-02)
+pywebview>=4.4.0     # native desktop window wrapping the web UI
+pystray>=0.19.5      # system tray icon
+Pillow>=10.0.0       # tray icon image generation
+python-dotenv>=1.0.0 # loads GROQ_API_KEY etc. from .env (already used by 4 modules, undeclared)
+
+# Phase F, Step 1 — Voice interface (push-to-talk): abm/voice/voice_interface.py
+# STT = Groq Whisper (same GROQ_API_KEY, no new cloud account). TTS = local/
+# offline pyttsx3 (SAPI5 on Windows) — zero cost, zero cloud, won't choke the host.
+sounddevice>=0.4.6  # microphone capture
+pyttsx3>=2.90        # offline text-to-speech
+
+# Phase F, Step 2 — Noise suppression for the always-listening wake-word
+# loop (abm/voice/noise_suppression.py, copied from Arabang's own
+# lesedi-telephony-ns package). numpy is also already pulled in
+# transitively by sounddevice/chromadb, but it's declared explicitly here
+# since abm/voice/voice_interface.py's denoise_wav_bytes() depends on it
+# directly. Same version pin LSSAP uses, for a build already proven to
+# install on this machine.
+numpy>=1.24.0
+pywebrtc-audio==0.2.0

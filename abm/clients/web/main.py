@@ -194,16 +194,43 @@ class ABMWebAPIHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_POST(self):
-        if self.path == "/api/ask":
-            self.handle_ask()
-        elif self.path == "/api/ingest":
-            self.handle_ingest()
-        elif self.path == "/api/edit/propose":
-            self.handle_edit_propose()
-        elif self.path == "/api/edit/apply":
-            self.handle_edit_apply()
-        else:
-            self.send_error(404, "Not Found")
+        # Root-cause fix (2026-11-02): previously there was NO safety net around
+        # any POST handler. An unhandled exception inside handle_ask (e.g. a Groq
+        # failure, which GroqModelGateway deliberately raises rather than silently
+        # falling back) propagated straight out of the request thread with no HTTP
+        # response ever sent — the browser just hung on a blank reply forever.
+        # This wraps every POST route so a real error becomes a visible 500 with
+        # a message, instead of a silent dead connection.
+        try:
+            if self.path == "/api/ask":
+                self.handle_ask()
+            elif self.path == "/api/ingest":
+                self.handle_ingest()
+            elif self.path == "/api/edit/propose":
+                self.handle_edit_propose()
+            elif self.path == "/api/edit/apply":
+                self.handle_edit_apply()
+            elif self.path == "/api/voice/transcribe" or self.path.startswith("/api/voice/transcribe?"):
+                # Added 2026-11-02: the frontend now appends ?fast=1 for
+                # wake-word-only cycles (see handle_voice_transcribe), so
+                # this can no longer be an exact-string match.
+                self.handle_voice_transcribe()
+            else:
+                self.send_error(404, "Not Found")
+        except Exception as exc:
+            logger.exception("do_POST: unhandled error on %s", self.path)
+            try:
+                self.send_response(500)
+                self.send_header('Content-type', 'application/json')
+                self.end_headers()
+                self.wfile.write(json.dumps({
+                    "error": True,
+                    "message": f"ABM hit an internal error: {exc}",
+                }).encode('utf-8'))
+            except Exception:
+                # A response may already be partially sent, or the connection
+                # already broken — nothing more can be done at that point.
+                pass
 
     def handle_ask(self):
         content_length = int(self.headers.get('Content-Length', 0))
@@ -278,6 +305,71 @@ class ABMWebAPIHandler(BaseHTTPRequestHandler):
         self.send_header('Content-type', 'application/json')
         self.end_headers()
         self.wfile.write(json.dumps(response).encode('utf-8'))
+
+    def handle_voice_transcribe(self):
+        """
+        In-page push-to-talk / always-listening: accepts a raw WAV audio
+        blob (the browser now captures and encodes PCM directly, rather
+        than MediaRecorder's compressed webm/opus, specifically so this
+        can denoise it without needing an Opus decoder) and returns
+        {"text": "..."}.
+
+        Root-cause fix (2026-11-02): Arabang reported the always-listening
+        wake word getting missed/slow with background music playing.
+        denoise_wav_bytes() runs his own WebRTC noise suppressor (reused
+        from the Leseding/LSSAP telephony project) over the audio before
+        it ever reaches Whisper — fails open (returns the original audio)
+        if the suppressor isn't installed, so this never blocks voice
+        input, it only sometimes cleans it up first.
+
+        Reuses abm.voice.voice_interface.transcribe_with_groq rather than
+        duplicating the Groq Whisper call — same GROQ_API_KEY, same
+        no-silent-fallback error behavior. Any failure here is caught by
+        do_POST's wrapper and comes back as a proper 500, not a hang.
+        """
+        content_length = int(self.headers.get('Content-Length', 0))
+        if content_length == 0:
+            self.send_error(400, "Empty Body")
+            return
+
+        audio_bytes = self.rfile.read(content_length)
+
+        import tempfile
+        from pathlib import Path as _Path
+        from abm.voice.voice_interface import (
+            GROQ_WHISPER_MODEL_FAST,
+            denoise_wav_bytes,
+            transcribe_with_groq,
+        )
+
+        # Added 2026-11-02: ?fast=1 means this is a wake-word-only cycle in
+        # the always-listening loop (ChatInterface.jsx) — it only needs to
+        # roughly catch "ABM 2.0", not transcribe with full accuracy, so it
+        # trades some accuracy for Whisper's faster turbo model. A real
+        # command (no ?fast=1) still gets the full, more accurate model.
+        qs = parse_qs(urlparse(self.path).query)
+        use_fast_model = qs.get("fast", ["0"])[0] in ("1", "true")
+        model = GROQ_WHISPER_MODEL_FAST if use_fast_model else None
+
+        audio_bytes = denoise_wav_bytes(audio_bytes)
+
+        tmp = tempfile.NamedTemporaryFile(prefix="abm_web_voice_", suffix=".wav", delete=False)
+        tmp_path = _Path(tmp.name)
+        tmp.write(audio_bytes)
+        tmp.close()
+
+        try:
+            text = transcribe_with_groq(tmp_path, model=model)
+        finally:
+            try:
+                tmp_path.unlink(missing_ok=True)
+            except Exception:
+                pass
+
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({"text": text}).encode('utf-8'))
 
     def handle_ingest(self):
         if not registry:

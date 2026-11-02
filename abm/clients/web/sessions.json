@@ -4475,5 +4475,896 @@
         }
       }
     ]
+  },
+  "f101d6c4-3055-46e7-a369-1b0d7d073e76": {
+    "title": "hell 0 ABM 2.0...",
+    "timestamp": 1793582446.1230032,
+    "messages": [
+      {
+        "id": 1793581604028,
+        "role": "user",
+        "text": "hell 0 ABM 2.0"
+      },
+      {
+        "id": 1793581604051,
+        "role": "agent",
+        "text": "",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      },
+      {
+        "id": 1793582424950,
+        "role": "user",
+        "text": "hell 0 ABM 2.0"
+      },
+      {
+        "id": 1793582424965,
+        "role": "agent",
+        "text": "",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      },
+      {
+        "id": 1793582446106,
+        "role": "user",
+        "text": "why"
+      },
+      {
+        "id": 1793582446120,
+        "role": "agent",
+        "text": "",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "77df385c-7635-4935-b4b4-4b3557fe7f46": {
+    "title": "Good morning, India....",
+    "timestamp": 1793612823.8591444,
+    "messages": [
+      {
+        "id": 1793612486005,
+        "role": "user",
+        "text": "Good morning, India."
+      },
+      {
+        "id": 1793612486031,
+        "role": "agent",
+        "text": "I don't have anything in memory that's directly relevant to that yet. Try rephrasing, or ask about a specific project, task, or decision \u2014 I learn from what you tell me directly too.",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      },
+      {
+        "id": 1793612520945,
+        "role": "user",
+        "text": "I was just saying good moring ABM"
+      },
+      {
+        "id": 1793612520966,
+        "role": "agent",
+        "text": "I don't have anything in memory that's directly relevant to that yet. Try rephrasing, or ask about a specific project, task, or decision \u2014 I learn from what you tell me directly too.",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      },
+      {
+        "id": 1793612535939,
+        "role": "user",
+        "text": "HELLO"
+      },
+      {
+        "id": 1793612535953,
+        "role": "agent",
+        "text": "Hey! I'm ABM 2.0 \u2014 ready to help. What are you working on?",
+        "sources": [],
+        "metadata": {
+          "department": "conversational",
+          "confidence": "high"
+        }
+      },
+      {
+        "id": 1793612564617,
+        "role": "user",
+        "text": "hOW ARE YOU"
+      },
+      {
+        "id": 1793612564636,
+        "role": "agent",
+        "text": "I am ABM 2.0, your personal cognitive layer and digital twin. I can help launch desktop applications, manage project memory, run automated workflows, answer queries, and supervise your strategic tasks.",
+        "sources": [],
+        "metadata": {
+          "department": "conversational",
+          "confidence": "high"
+        }
+      },
+      {
+        "id": 1793612600329,
+        "role": "user",
+        "text": "alright"
+      },
+      {
+        "id": 1793612600346,
+        "role": "agent",
+        "text": "Got it! Let me know if there's anything you need.",
+        "sources": [],
+        "metadata": {
+          "department": "conversational",
+          "confidence": "high"
+        }
+      },
+      {
+        "id": 1793612823840,
+        "role": "user",
+        "text": "Hello, ABM. How are you? I'd like to check on our progress, how sofas are good. Whatever you manage and what I make, man."
+      },
+      {
+        "id": 1793612823855,
+        "role": "agent",
+        "text": "I don't have anything in memory that's directly relevant to that yet. Try rephrasing, or ask about a specific project, task, or decision \u2014 I learn from what you tell me directly too.",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "059d063b-22c6-49c6-81ab-d333bff497b5": {
+    "title": "open spotify...",
+    "timestamp": 1793615670.2037323,
+    "messages": [
+      {
+        "id": 1793613587575,
+        "role": "user",
+        "text": "open spotify"
+      },
+      {
+        "id": 1793613587589,
+        "role": "agent",
+        "text": "\u2705 Launched spotify (PID 27612).",
+        "sources": [],
+        "metadata": {
+          "department": "tier1_action",
+          "confidence": "high"
+        }
+      },
+      {
+        "id": 1793613834913,
+        "role": "user",
+        "text": "open what's app"
+      },
+      {
+        "id": 1793613834925,
+        "role": "agent",
+        "text": "I don't have anything in memory that's directly relevant to that yet. Try rephrasing, or ask about a specific project, task, or decision \u2014 I learn from what you tell me directly too.",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      },
+      {
+        "id": 1793613865064,
+        "role": "user",
+        "text": "open fc 26"
+      },
+      {
+        "id": 1793613865078,
+        "role": "agent",
+        "text": "I don't have anything in memory that's directly relevant to that yet. Try rephrasing, or ask about a specific project, task, or decision \u2014 I learn from what you tell me directly too.",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      },
+      {
+        "id": 1793615507299,
+        "role": "user",
+        "text": "open whatsApp"
+      },
+      {
+        "id": 1793615507315,
+        "role": "agent",
+        "text": "\u2705 Launched whatsapp (PID 36408).",
+        "sources": [],
+        "metadata": {
+          "department": "tier1_action",
+          "confidence": "high"
+        }
+      },
+      {
+        "id": 1793615525177,
+        "role": "user",
+        "text": "close whatsApp"
+      },
+      {
+        "id": 1793615525193,
+        "role": "agent",
+        "text": "\u26a0\ufe0f whatsapp does not appear to be running.",
+        "sources": [],
+        "metadata": {
+          "department": "tier1_action",
+          "confidence": "high"
+        }
+      },
+      {
+        "id": 1793615557624,
+        "role": "user",
+        "text": "close spotify "
+      },
+      {
+        "id": 1793615557644,
+        "role": "agent",
+        "text": "\u2705 Closed spotify (PID(s): 10168, 11404, 11752, 15616, 15756, 21704, 22004, 22128, 28524).",
+        "sources": [],
+        "metadata": {
+          "department": "tier1_action",
+          "confidence": "high"
+        }
+      },
+      {
+        "id": 1793615574009,
+        "role": "user",
+        "text": "Open spotify"
+      },
+      {
+        "id": 1793615574024,
+        "role": "agent",
+        "text": "\u2705 Launched spotify (PID 21944).",
+        "sources": [],
+        "metadata": {
+          "department": "tier1_action",
+          "confidence": "high"
+        }
+      },
+      {
+        "id": 1793615624895,
+        "role": "user",
+        "text": "open fc 26"
+      },
+      {
+        "id": 1793615624909,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      },
+      {
+        "id": 1793615655308,
+        "role": "user",
+        "text": "open whatsApp"
+      },
+      {
+        "id": 1793615655323,
+        "role": "agent",
+        "text": "\u2705 Launched whatsapp (PID 22052).",
+        "sources": [],
+        "metadata": {
+          "department": "tier1_action",
+          "confidence": "high"
+        }
+      },
+      {
+        "id": 1793615670188,
+        "role": "user",
+        "text": "close whatsApp"
+      },
+      {
+        "id": 1793615670202,
+        "role": "agent",
+        "text": "\u26a0\ufe0f whatsapp does not appear to be running.",
+        "sources": [],
+        "metadata": {
+          "department": "tier1_action",
+          "confidence": "high"
+        }
+      }
+    ]
+  },
+  "f79473ed-851e-4540-b717-23ed9e26fd63": {
+    "title": "Oakton WhatsApp, ABM 2.0,...",
+    "timestamp": 1793617132.7611709,
+    "messages": [
+      {
+        "id": 1793617132746,
+        "role": "user",
+        "text": "Oakton WhatsApp, ABM 2.0,"
+      },
+      {
+        "id": 1793617132759,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "de51f60e-f54c-488e-b6a0-bdf517e135c5": {
+    "title": "open WhatsApp. ABM 2.0,...",
+    "timestamp": 1793617159.0822625,
+    "messages": [
+      {
+        "id": 1793617159061,
+        "role": "user",
+        "text": "open WhatsApp. ABM 2.0, open WhatsApp."
+      },
+      {
+        "id": 1793617159079,
+        "role": "agent",
+        "text": "\u2705 Launched whatsapp (PID 35720).",
+        "sources": [],
+        "metadata": {
+          "department": "tier1_action",
+          "confidence": "high"
+        }
+      }
+    ]
+  },
+  "570910b1-344d-4431-9ed0-808e0a64eec6": {
+    "title": "close with....",
+    "timestamp": 1793617176.1467462,
+    "messages": [
+      {
+        "id": 1793617176131,
+        "role": "user",
+        "text": "close with."
+      },
+      {
+        "id": 1793617176144,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "0426ca61-1a83-4e9c-90ba-353dad7e39a3": {
+    "title": "open WhatsApp, and it...",
+    "timestamp": 1793617244.8741536,
+    "messages": [
+      {
+        "id": 1793617244848,
+        "role": "user",
+        "text": "open WhatsApp, and it took a few seconds. I don't know who said it."
+      },
+      {
+        "id": 1793617244872,
+        "role": "agent",
+        "text": "\u2705 Launched whatsapp (PID 3956).",
+        "sources": [],
+        "metadata": {
+          "department": "tier1_action",
+          "confidence": "high"
+        }
+      }
+    ]
+  },
+  "2f76f3fd-f101-4044-a1ae-cd670157bee7": {
+    "title": "for nice suppression for...",
+    "timestamp": 1793617299.162296,
+    "messages": [
+      {
+        "id": 1793617299145,
+        "role": "user",
+        "text": "for nice suppression for events like this when they start playing in the background so that he actually focuses only on the keywords I'm saying ABM 2.0 and then he'll"
+      },
+      {
+        "id": 1793617299160,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "3bb2db11-393a-4053-a7ed-a5e626f2db3b": {
+    "title": "Close Spotify...",
+    "timestamp": 1793617338.3384545,
+    "messages": [
+      {
+        "id": 1793617338315,
+        "role": "user",
+        "text": "Close Spotify"
+      },
+      {
+        "id": 1793617338334,
+        "role": "agent",
+        "text": "\u2705 Closed spotify (PID(s): 3188, 3372, 6580, 8044, 22624, 24292, 33012, 34808).",
+        "sources": [],
+        "metadata": {
+          "department": "tier1_action",
+          "confidence": "high"
+        }
+      }
+    ]
+  },
+  "a8d5fc4c-2e6b-4c0c-8e23-84aa389d9eca": {
+    "title": "Open Spotify....",
+    "timestamp": 1793617351.2206392,
+    "messages": [
+      {
+        "id": 1793617351201,
+        "role": "user",
+        "text": "Open Spotify."
+      },
+      {
+        "id": 1793617351218,
+        "role": "agent",
+        "text": "\u2705 Launched spotify (PID 10408).",
+        "sources": [],
+        "metadata": {
+          "department": "tier1_action",
+          "confidence": "high"
+        }
+      }
+    ]
+  },
+  "8c18bc18-fb35-4f63-b81d-f831ede7aa1e": {
+    "title": "OPM, FC, 26....",
+    "timestamp": 1793617424.4112797,
+    "messages": [
+      {
+        "id": 1793617424395,
+        "role": "user",
+        "text": "OPM, FC, 26."
+      },
+      {
+        "id": 1793617424409,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "af81e56a-d28d-4281-bef7-ee4b2a906538": {
+    "title": "Close45....",
+    "timestamp": 1793617519.2050278,
+    "messages": [
+      {
+        "id": 1793617519190,
+        "role": "user",
+        "text": "Close45."
+      },
+      {
+        "id": 1793617519203,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "305a2310-4279-4f22-ab2e-eaab7909a2a5": {
+    "title": "Floats45....",
+    "timestamp": 1793617535.8626888,
+    "messages": [
+      {
+        "id": 1793617535848,
+        "role": "user",
+        "text": "Floats45."
+      },
+      {
+        "id": 1793617535861,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "0bb1f3e9-686c-4ab3-bc01-c7274bb494ad": {
+    "title": "open WhatsApp....",
+    "timestamp": 1793617634.5185838,
+    "messages": [
+      {
+        "id": 1793617634499,
+        "role": "user",
+        "text": "open WhatsApp."
+      },
+      {
+        "id": 1793617634515,
+        "role": "agent",
+        "text": "\u2705 Launched whatsapp (PID 26356).",
+        "sources": [],
+        "metadata": {
+          "department": "tier1_action",
+          "confidence": "high"
+        }
+      }
+    ]
+  },
+  "4cb9a58f-28c6-4c84-9529-ddc09ae56b2e": {
+    "title": "Close 45....",
+    "timestamp": 1793617699.3102329,
+    "messages": [
+      {
+        "id": 1793617699294,
+        "role": "user",
+        "text": "Close 45."
+      },
+      {
+        "id": 1793617699308,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "32199698-d623-4806-8a76-ae4254603fc9": {
+    "title": "Close Fortified...",
+    "timestamp": 1793617839.5189059,
+    "messages": [
+      {
+        "id": 1793617839503,
+        "role": "user",
+        "text": "Close Fortified"
+      },
+      {
+        "id": 1793617839517,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "b506a9a2-488d-4792-a648-f072058ef1f2": {
+    "title": "Open FC 26....",
+    "timestamp": 1793617868.717384,
+    "messages": [
+      {
+        "id": 1793617868699,
+        "role": "user",
+        "text": "Open FC 26."
+      },
+      {
+        "id": 1793617868715,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "601b5427-d432-4ffd-a0f8-dfef04aa4b75": {
+    "title": "OpenStamp....",
+    "timestamp": 1793617897.444714,
+    "messages": [
+      {
+        "id": 1793617897430,
+        "role": "user",
+        "text": "OpenStamp."
+      },
+      {
+        "id": 1793617897443,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "9edf0830-b653-47a7-8883-9065c187976c": {
+    "title": "how are you?...",
+    "timestamp": 1793617920.5792632,
+    "messages": [
+      {
+        "id": 1793617920564,
+        "role": "user",
+        "text": "how are you?"
+      },
+      {
+        "id": 1793617920577,
+        "role": "agent",
+        "text": "I am ABM 2.0, your personal cognitive layer and digital twin. I can help launch desktop applications, manage project memory, run automated workflows, answer queries, and supervise your strategic tasks.",
+        "sources": [],
+        "metadata": {
+          "department": "conversational",
+          "confidence": "high"
+        }
+      }
+    ]
+  },
+  "3fc11298-0e5e-4348-9cb9-2ec335d0383d": {
+    "title": "a personal cognitive layer...",
+    "timestamp": 1793617948.8482337,
+    "messages": [
+      {
+        "id": 1793617948833,
+        "role": "user",
+        "text": "a personal cognitive layer and I can help you launch a desktop application, manage your programming, run automated workflows and queries, and supervise your strategic tasks."
+      },
+      {
+        "id": 1793617948847,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "4cd43caa-c81f-493a-b201-49b6a9fcfad4": {
+    "title": "open, FC 26....",
+    "timestamp": 1793621646.03921,
+    "messages": [
+      {
+        "id": 1793621646023,
+        "role": "user",
+        "text": "open, FC 26."
+      },
+      {
+        "id": 1793621646037,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "93927199-27ad-4c9c-b421-dd0579e4c704": {
+    "title": "open WhatsApp....",
+    "timestamp": 1793621685.397977,
+    "messages": [
+      {
+        "id": 1793621685378,
+        "role": "user",
+        "text": "open WhatsApp."
+      },
+      {
+        "id": 1793621685395,
+        "role": "agent",
+        "text": "\u2705 Launched whatsapp (PID 34296).",
+        "sources": [],
+        "metadata": {
+          "department": "tier1_action",
+          "confidence": "high"
+        }
+      }
+    ]
+  },
+  "a489d439-7d25-4bec-9617-a29a37e0e550": {
+    "title": "open Spotify....",
+    "timestamp": 1793621876.7983928,
+    "messages": [
+      {
+        "id": 1793621876779,
+        "role": "user",
+        "text": "open Spotify."
+      },
+      {
+        "id": 1793621876795,
+        "role": "agent",
+        "text": "\u2705 Launched spotify (PID 34112).",
+        "sources": [],
+        "metadata": {
+          "department": "tier1_action",
+          "confidence": "high"
+        }
+      }
+    ]
+  },
+  "505b58c8-f774-439d-9db1-8089260d6a4c": {
+    "title": "open YouTube....",
+    "timestamp": 1793621952.086772,
+    "messages": [
+      {
+        "id": 1793621952070,
+        "role": "user",
+        "text": "open YouTube."
+      },
+      {
+        "id": 1793621952085,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "4a741188-5229-499f-830d-87a6ac18076a": {
+    "title": "open Opera and search...",
+    "timestamp": 1793621971.565865,
+    "messages": [
+      {
+        "id": 1793621971549,
+        "role": "user",
+        "text": "open Opera and search for YouTube."
+      },
+      {
+        "id": 1793621971563,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "d2ae5a97-786d-44ea-8fbc-eb974386018f": {
+    "title": "Gemini....",
+    "timestamp": 1793622152.732726,
+    "messages": [
+      {
+        "id": 1793622152715,
+        "role": "user",
+        "text": "Gemini."
+      },
+      {
+        "id": 1793622152731,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "60b1b643-e21b-458c-997b-0ade208b9895": {
+    "title": "open Gemini....",
+    "timestamp": 1793622199.7534747,
+    "messages": [
+      {
+        "id": 1793622199736,
+        "role": "user",
+        "text": "open Gemini."
+      },
+      {
+        "id": 1793622199751,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "81431883-77da-4328-a578-45eff238a22d": {
+    "title": "go to sleep....",
+    "timestamp": 1793622700.7647102,
+    "messages": [
+      {
+        "id": 1793622700748,
+        "role": "user",
+        "text": "go to sleep."
+      },
+      {
+        "id": 1793622700763,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "7bbba5e4-7b65-44d2-817e-fe7fa9551582": {
+    "title": "How far are we...",
+    "timestamp": 1793622731.9243808,
+    "messages": [
+      {
+        "id": 1793622731907,
+        "role": "user",
+        "text": "How far are we from our milestone?"
+      },
+      {
+        "id": 1793622731921,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "2d08934f-b72d-41b9-9228-8edffb9a7b6b": {
+    "title": "close or pair....",
+    "timestamp": 1793622777.014596,
+    "messages": [
+      {
+        "id": 1793622776997,
+        "role": "user",
+        "text": "close or pair."
+      },
+      {
+        "id": 1793622777012,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
+  },
+  "06d8db73-befd-4822-8db7-b63a73f95c9c": {
+    "title": "Close Opera Browser...",
+    "timestamp": 1793622810.9593,
+    "messages": [
+      {
+        "id": 1793622810942,
+        "role": "user",
+        "text": "Close Opera Browser"
+      },
+      {
+        "id": 1793622810957,
+        "role": "agent",
+        "text": "I'm sorry, I couldn't generate an answer because the reasoning gateway (Groq) is unreachable or returned an error. Please check your GROQ_API_KEY environment variable. (details: GroqModelGateway: HTTP error from Groq API. Detail: 404 Client Error: Not Found for url: https://api.groq.com/openai/v1/chat/completions)",
+        "sources": [],
+        "metadata": {
+          "department": "software_engineering",
+          "confidence": "low"
+        }
+      }
+    ]
   }
 }

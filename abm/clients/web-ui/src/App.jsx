@@ -94,9 +94,15 @@ function App() {
             <ChatInterface 
               currentSessionId={currentSessionId} 
               onSessionUpdated={(newSessionId) => {
-                if (newSessionId !== currentSessionId) {
-                  setCurrentSessionId(newSessionId);
-                }
+                // Root-cause fix (2026-11-02): this used to compare against
+                // `currentSessionId` from whichever render created this
+                // specific callback instance — in the always-listening voice
+                // loop that closure can be several setTimeout callbacks old,
+                // so the comparison was frequently stale. setCurrentSessionId
+                // is already a no-op when the value hasn't actually changed,
+                // so the comparison was never doing anything the setter
+                // wasn't already doing correctly on its own.
+                setCurrentSessionId(newSessionId);
                 fetchSessions();
               }}
             />
